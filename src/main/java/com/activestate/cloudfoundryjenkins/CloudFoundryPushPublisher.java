@@ -18,9 +18,11 @@ import hudson.tasks.Recorder;
 import hudson.util.FormValidation;
 import net.lingala.zip4j.core.ZipFile;
 import net.lingala.zip4j.exception.ZipException;
+
 import org.cloudfoundry.client.lib.CloudCredentials;
 import org.cloudfoundry.client.lib.CloudFoundryClient;
 import org.cloudfoundry.client.lib.CloudFoundryException;
+import org.cloudfoundry.client.lib.HttpProxyConfiguration;
 import org.cloudfoundry.client.lib.StartingInfo;
 import org.cloudfoundry.client.lib.domain.*;
 import org.cloudfoundry.client.lib.org.springframework.web.client.ResourceAccessException;
@@ -28,6 +30,7 @@ import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 
 import javax.net.ssl.SSLPeerUnverifiedException;
+
 import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -48,6 +51,7 @@ public class CloudFoundryPushPublisher extends Recorder {
     public final String username;
     public final String password;
     public final boolean selfSigned;
+    public final String proxy;
     public final boolean resetIfExists;
     public final OptionalManifest optionalManifest;
 
@@ -56,7 +60,7 @@ public class CloudFoundryPushPublisher extends Recorder {
 
     @DataBoundConstructor
     public CloudFoundryPushPublisher(String target, String organization, String cloudSpace,
-                                     String username, String password, boolean selfSigned,
+                                     String username, String password, boolean selfSigned, String proxy,
                                      boolean resetIfExists, OptionalManifest optionalManifest) {
         this.target = target;
         this.organization = organization;
@@ -64,6 +68,7 @@ public class CloudFoundryPushPublisher extends Recorder {
         this.username = username;
         this.password = password;
         this.selfSigned = selfSigned;
+        this.proxy = proxy;
         this.resetIfExists = resetIfExists;
         this.optionalManifest = optionalManifest;
     }
@@ -89,8 +94,10 @@ public class CloudFoundryPushPublisher extends Recorder {
             setAppURI("https://" + deploymentInfo.getHostname() + "." + deploymentInfo.getDomain());
 
             CloudCredentials credentials = new CloudCredentials(username, password);
+            HttpProxyConfiguration proxyConfig = buildProxyConfiguration(proxy);
+            
             CloudFoundryClient client = new CloudFoundryClient(credentials, targetUrl, organization, cloudSpace,
-                    null, selfSigned);
+            		proxyConfig, selfSigned);
             client.login();
 
             listener.getLogger().println("Pushing " + appName + " app to " + target);
@@ -289,6 +296,22 @@ public class CloudFoundryPushPublisher extends Recorder {
     public void setAppURI(String appURI) {
         this.appURI = appURI;
     }
+    
+    private static HttpProxyConfiguration buildProxyConfiguration(String proxy)
+    {
+        if (proxy == null || proxy.trim().length() == 0)
+        	return null;
+        
+        try
+        {
+			URL url = new URL(proxy);
+			return new HttpProxyConfiguration(url.getHost(), url.getPort());
+        }
+        catch (MalformedURLException e)
+        {
+        	throw new IllegalArgumentException("Malformed Proxy URL", e);
+        }
+    }
 
     public static class OptionalManifest {
         public final String appName;
@@ -371,13 +394,16 @@ public class CloudFoundryPushPublisher extends Recorder {
                                                @QueryParameter("password") final String password,
                                                @QueryParameter("organization") final String organization,
                                                @QueryParameter("cloudSpace") final String cloudSpace,
-                                               @QueryParameter("selfSigned") final boolean selfSigned) {
+                                               @QueryParameter("selfSigned") final boolean selfSigned,
+                                               @QueryParameter("proxy") final String proxy) {
 
             try {
                 URL targetUrl = new URL(target);
                 CloudCredentials credentials = new CloudCredentials(username, password);
+                HttpProxyConfiguration proxyConfig = buildProxyConfiguration(proxy);
+                
                 CloudFoundryClient client = new CloudFoundryClient(credentials, targetUrl, organization, cloudSpace,
-                        null, selfSigned);
+                        proxyConfig, selfSigned);
                 client.login();
                 client.getCloudInfo();
                 if (targetUrl.getHost().startsWith("api.")) {
