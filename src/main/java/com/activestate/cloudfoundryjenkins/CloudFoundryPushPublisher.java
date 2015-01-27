@@ -7,9 +7,11 @@ package com.activestate.cloudfoundryjenkins;
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
+import hudson.ProxyConfiguration;
 import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
 import hudson.model.BuildListener;
+import hudson.model.Hudson;
 import hudson.model.Result;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.BuildStepMonitor;
@@ -19,9 +21,11 @@ import hudson.util.FormValidation;
 import jenkins.model.Jenkins;
 import net.lingala.zip4j.core.ZipFile;
 import net.lingala.zip4j.exception.ZipException;
+
 import org.cloudfoundry.client.lib.CloudCredentials;
 import org.cloudfoundry.client.lib.CloudFoundryClient;
 import org.cloudfoundry.client.lib.CloudFoundryException;
+import org.cloudfoundry.client.lib.HttpProxyConfiguration;
 import org.cloudfoundry.client.lib.StartingInfo;
 import org.cloudfoundry.client.lib.domain.*;
 import org.cloudfoundry.client.lib.org.springframework.web.client.ResourceAccessException;
@@ -29,6 +33,7 @@ import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 
 import javax.net.ssl.SSLPeerUnverifiedException;
+
 import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -36,6 +41,7 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 public class CloudFoundryPushPublisher extends Recorder {
 
@@ -135,8 +141,10 @@ public class CloudFoundryPushPublisher extends Recorder {
             addToAppURIs(appURI);
 
             CloudCredentials credentials = new CloudCredentials(username, password);
+            HttpProxyConfiguration proxyConfig = buildProxyConfiguration(targetUrl);
+            
             CloudFoundryClient client = new CloudFoundryClient(credentials, targetUrl, organization, cloudSpace,
-                    null, selfSigned);
+            		proxyConfig, selfSigned);
             client.login();
 
             listener.getLogger().println("Pushing " + appName + " app to " + target);
@@ -336,6 +344,21 @@ public class CloudFoundryPushPublisher extends Recorder {
     public void addToAppURIs(String appURI) {
         this.appURIs.add(appURI);
     }
+    
+    private static HttpProxyConfiguration buildProxyConfiguration(URL targetURL)
+    {
+    	ProxyConfiguration proxyConfig = Hudson.getInstance().proxy;
+    	if (proxyConfig == null)
+    		return null;
+    	
+    	String host = targetURL.getHost();
+    	for (Pattern p : proxyConfig.getNoProxyHostPatterns()) {
+    	    if (p.matcher(host).matches())
+                return null;
+		}
+    	
+    	return new HttpProxyConfiguration(proxyConfig.name, proxyConfig.port);
+    }
 
     public static class OptionalManifest {
         public final String appName;
@@ -423,8 +446,10 @@ public class CloudFoundryPushPublisher extends Recorder {
             try {
                 URL targetUrl = new URL(target);
                 CloudCredentials credentials = new CloudCredentials(username, password);
+                HttpProxyConfiguration proxyConfig = buildProxyConfiguration(targetUrl);
+                
                 CloudFoundryClient client = new CloudFoundryClient(credentials, targetUrl, organization, cloudSpace,
-                        null, selfSigned);
+                        proxyConfig, selfSigned);
                 client.login();
                 client.getCloudInfo();
                 if (targetUrl.getHost().startsWith("api.")) {
