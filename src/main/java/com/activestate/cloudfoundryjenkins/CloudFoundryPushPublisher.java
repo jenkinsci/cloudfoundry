@@ -181,7 +181,17 @@ public class CloudFoundryPushPublisher extends Recorder {
 
             // Delete route if no-route parameter
             if (deploymentInfo.isNoRoute()) {
-                client.deleteRoute(deploymentInfo.getHostname(), deploymentInfo.getDomain());
+            	// check if the route exists at all
+            	
+            	List<CloudRoute> existingRoutes = client.getRoutes(deploymentInfo.getDomain());
+            	
+            	for (CloudRoute route : existingRoutes) {
+					if (route.getHost().equals(deploymentInfo.getHostname()))
+					{
+		                client.deleteRoute(deploymentInfo.getHostname(), deploymentInfo.getDomain());
+		                break;
+					}
+				}
             }
 
             // Add environment variables
