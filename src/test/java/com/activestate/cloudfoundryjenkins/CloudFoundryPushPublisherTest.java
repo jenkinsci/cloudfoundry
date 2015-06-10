@@ -5,6 +5,7 @@
 package com.activestate.cloudfoundryjenkins;
 
 import com.activestate.cloudfoundryjenkins.CloudFoundryPushPublisher.EnvironmentVariable;
+import com.activestate.cloudfoundryjenkins.CloudFoundryPushPublisher.ExistingAppHandler;
 import com.activestate.cloudfoundryjenkins.CloudFoundryPushPublisher.ManifestChoice;
 import com.activestate.cloudfoundryjenkins.CloudFoundryPushPublisher.ServiceName;
 import com.cloudbees.plugins.credentials.CredentialsProvider;
@@ -12,9 +13,11 @@ import com.cloudbees.plugins.credentials.CredentialsScope;
 import com.cloudbees.plugins.credentials.CredentialsStore;
 import com.cloudbees.plugins.credentials.domains.Domain;
 import com.cloudbees.plugins.credentials.impl.UsernamePasswordCredentialsImpl;
+
 import hudson.model.FreeStyleBuild;
 import hudson.model.FreeStyleProject;
 import hudson.model.Result;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.fluent.Request;
@@ -90,7 +93,7 @@ public class CloudFoundryPushPublisherTest {
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
 
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, ManifestChoice.defaultManifestFileConfig());
+                "testCredentialsId", false, ExistingAppHandler.getDefault(), ManifestChoice.defaultManifestFileConfig());
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -121,7 +124,7 @@ public class CloudFoundryPushPublisherTest {
                         "target/hello-java-1.0.war", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, manifest);
+                "testCredentialsId", false, ExistingAppHandler.getDefault(), manifest);
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -153,7 +156,7 @@ public class CloudFoundryPushPublisherTest {
                         "target/hello-java-1.0.war", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf1 = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, true, manifest1);
+                "testCredentialsId", false, new ExistingAppHandler("RESTART", true), manifest1);
         project.getPublishersList().add(cf1);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " 1 completed");
@@ -172,7 +175,7 @@ public class CloudFoundryPushPublisherTest {
                         "target/hello-java-1.0.war", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf2 = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, true, manifest2);
+                "testCredentialsId", false, new ExistingAppHandler("RESTART", true), manifest2);
         project.getPublishersList().add(cf2);
         build = project.scheduleBuild2(0).get();
 
@@ -193,7 +196,7 @@ public class CloudFoundryPushPublisherTest {
                         "target/hello-java-1.0.war", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, manifest);
+                "testCredentialsId", false, ExistingAppHandler.getDefault(), manifest);
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -225,7 +228,7 @@ public class CloudFoundryPushPublisherTest {
                         "https://github.com/heroku/heroku-buildpack-nodejs", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, manifest);
+                "testCredentialsId", false, ExistingAppHandler.getDefault(), manifest);
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -252,7 +255,7 @@ public class CloudFoundryPushPublisherTest {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("multi-hello-java.zip")));
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, ManifestChoice.defaultManifestFileConfig());
+                "testCredentialsId", false, ExistingAppHandler.getDefault(), ManifestChoice.defaultManifestFileConfig());
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -294,7 +297,7 @@ public class CloudFoundryPushPublisherTest {
         ManifestChoice manifestChoice = new ManifestChoice("manifestFile", "manifest/manifest.yml",
                 null, 0, null, 0, 0, false, null, null, null, null, null, null);
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, manifestChoice);
+                "testCredentialsId", false, ExistingAppHandler.getDefault(), manifestChoice);
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -329,7 +332,7 @@ public class CloudFoundryPushPublisherTest {
                         "target/hello-java-1.0.war", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, manifest);
+                "testCredentialsId", false, ExistingAppHandler.getDefault(), manifest);
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -348,7 +351,7 @@ public class CloudFoundryPushPublisherTest {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("python-env.zip")));
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, ManifestChoice.defaultManifestFileConfig());
+                "testCredentialsId", false, ExistingAppHandler.getDefault(), ManifestChoice.defaultManifestFileConfig());
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -389,7 +392,7 @@ public class CloudFoundryPushPublisherTest {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("python-env-services.zip")));
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, ManifestChoice.defaultManifestFileConfig());
+                "testCredentialsId", false, ExistingAppHandler.getDefault(), ManifestChoice.defaultManifestFileConfig());
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -421,7 +424,7 @@ public class CloudFoundryPushPublisherTest {
                         "target/hello-java-1.0.war", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, manifest);
+                "testCredentialsId", false, ExistingAppHandler.getDefault(), manifest);
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -445,7 +448,7 @@ public class CloudFoundryPushPublisherTest {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher("https://does-not-exist.local",
-                TEST_ORG, TEST_SPACE, "testCredentialsId", false, false, null);
+                TEST_ORG, TEST_SPACE, "testCredentialsId", false, ExistingAppHandler.getDefault(), null);
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -467,7 +470,7 @@ public class CloudFoundryPushPublisherTest {
                 new UsernamePasswordCredentialsImpl(CredentialsScope.GLOBAL, "wrongCredentialsId", "",
                         "wrongName", "wrongPass"));
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "wrongCredentialsId", false, false, ManifestChoice.defaultManifestFileConfig());
+                "wrongCredentialsId", false, ExistingAppHandler.getDefault(), ManifestChoice.defaultManifestFileConfig());
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
