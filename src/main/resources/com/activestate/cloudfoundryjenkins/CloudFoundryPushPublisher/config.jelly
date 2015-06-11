@@ -17,9 +17,23 @@
   </f:entry>
   <f:validateButton title="Test Connection" progress="Testing..." method="testConnection"
                     with="target,username,password,credentialsId,organization,cloudSpace,selfSigned"/>
-  <f:entry title="Reset app if already exists" field="resetIfExists">
-    <f:checkbox/>
-  </f:entry>
+  
+  <f:entry title="Handle Existing Application : ">
+
+  <f:radioBlock title="Blue/Green Deployment" name="existingAppHandler" value="BGDEPLOY"
+                checked="${instance.existingAppHandler.value == 'BGDEPLOY'}">
+         <f:entry title="Do Not Delete Blue (orig) instance" field="retainOrigApp">
+   			 <f:checkbox checked="${instance.existingAppHandler.retainOrigApp}"/>
+  		</f:entry>    
+  </f:radioBlock>
+   <f:radioBlock title="Delete existing app and create new" name="existingAppHandler" value="RECREATE"
+                checked="${instance.existingAppHandler.value == 'RECREATE'}">
+  </f:radioBlock>
+  <f:radioBlock title="Push app bits and restart" name="existingAppHandler" value="RESTART" 
+                checked="${instance.existingAppHandler.value == 'RESTART'}">
+  </f:radioBlock>
+  
+ </f:entry>
 
   <f:radioBlock title="Read configuration from a manifest file" name="manifestChoice" value="manifestFile"
                 checked="${instance.manifestChoice.value != 'jenkinsConfig'}">

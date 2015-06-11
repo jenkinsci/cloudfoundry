@@ -7,3 +7,4 @@ applications:
     ENV_VAR_ONE: value1
     ENV_VAR_TWO: value2
     ENV_VAR_THREE: value3
+    SSH_CONNECTION: “NoDockerHub NoDockerPort NoDockerIP NoDocker”
