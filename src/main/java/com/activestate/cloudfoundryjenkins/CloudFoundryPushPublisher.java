@@ -438,35 +438,30 @@ public class CloudFoundryPushPublisher extends Recorder {
         this.appURIs.add(appURI);
     }
     
-    public static class ExistingAppHandler {
-    	enum Choice {
-    		BGDEPLOY,
-    		RECREATE,
-    		RESTART;
-    	}
-    	
-    	public final String value;
-    	public final boolean retainOrigApp;
-    	 
-    	@DataBoundConstructor
-    	public ExistingAppHandler( String value, boolean retainOrigApp) {
-    		System.out.println("Invoked ExistingAppHandler with value "+value + " and retainOrigApp as "+retainOrigApp);
-    		if(value == null) {
-    			this.value = Choice.RESTART.toString();
-    		}
-    		else
-    		{
-    			this.value = Choice.valueOf(value).toString();
-    		}
-    		this.retainOrigApp = retainOrigApp;
-    	}
+	public static class ExistingAppHandler {
+		enum Choice {
+			BGDEPLOY, RECREATE, RESTART;
+		}
 
-    	public static  ExistingAppHandler getDefault() {
+		public final String value;
+		public final boolean retainOrigApp;
+
+		@DataBoundConstructor
+		public ExistingAppHandler(String value, boolean retainOrigApp) {
+			System.out.println("Invoked ExistingAppHandler with value " + value + " and retainOrigApp as " + retainOrigApp);
+			if (value == null) {
+				this.value = Choice.RESTART.toString();
+			} else {
+				this.value = Choice.valueOf(value).toString();
+			}
+			this.retainOrigApp = retainOrigApp;
+		}
+
+		public static ExistingAppHandler getDefault() {
 			return new ExistingAppHandler("RESTART", false);
 		}
-		
-    	
-    }
+
+	}
 
     /**
      * This class contains the choice of using either a manifest file or the optional Jenkins configuration.

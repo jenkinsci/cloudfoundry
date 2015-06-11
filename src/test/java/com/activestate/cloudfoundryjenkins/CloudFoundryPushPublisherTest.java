@@ -156,7 +156,7 @@ public class CloudFoundryPushPublisherTest {
                         "target/hello-java-1.0.war", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf1 = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, new ExistingAppHandler("RESTART", true), manifest1);
+                "testCredentialsId", false, new ExistingAppHandler("RECREATE", false), manifest1);
         project.getPublishersList().add(cf1);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " 1 completed");
@@ -175,7 +175,7 @@ public class CloudFoundryPushPublisherTest {
                         "target/hello-java-1.0.war", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf2 = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, new ExistingAppHandler("RESTART", true), manifest2);
+                "testCredentialsId", false, new ExistingAppHandler("RECREATE", false), manifest2);
         project.getPublishersList().add(cf2);
         build = project.scheduleBuild2(0).get();
 
