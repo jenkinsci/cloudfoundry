@@ -55,8 +55,10 @@ public class CloudFoundryPushPublisher extends Recorder {
     public final String cloudSpace;
     public final String credentialsId;
     public final boolean selfSigned;
-    public final boolean resetIfExists;
+    
+   // public final boolean resetIfExists;
     public final ManifestChoice manifestChoice;
+    public final ExistingAppHandler existingAppHandler;
 
     private List<String> appURIs = new ArrayList<String>();
 
@@ -66,13 +68,23 @@ public class CloudFoundryPushPublisher extends Recorder {
     @DataBoundConstructor
     public CloudFoundryPushPublisher(String target, String organization, String cloudSpace,
                                      String credentialsId, boolean selfSigned,
-                                     boolean resetIfExists, ManifestChoice manifestChoice) {
+                                     ExistingAppHandler existingAppHandler, ManifestChoice manifestChoice) {
         this.target = target;
         this.organization = organization;
         this.cloudSpace = cloudSpace;
         this.credentialsId = credentialsId;
         this.selfSigned = selfSigned;
-        this.resetIfExists = resetIfExists;
+        //this.resetIfExists = resetIfExists;
+        //this.bluegreen = bluegreen;
+        if(existingAppHandler == null) {
+        	System.out.println(" existingAppHandler is null. Creating default.");
+        	this.existingAppHandler = ExistingAppHandler.getDefault();
+        }
+        else
+        {
+        	System.out.println(" existingAppHandler is NOT null. Setting value as "+existingAppHandler.value + " and retainOrigApp as "+existingAppHandler.retainOrigApp);
+        	this.existingAppHandler = existingAppHandler;
+        }
         if (manifestChoice == null) {
             this.manifestChoice = ManifestChoice.defaultManifestFileConfig();
         } else {
@@ -301,7 +313,7 @@ public class CloudFoundryPushPublisher extends Recorder {
         boolean createNewApp = true;
         for (CloudApplication app : existingApps) {
             if (app.getName().equals(deploymentInfo.getAppName())) {
-                if (resetIfExists) {
+                if (existingAppHandler.value.equals(ExistingAppHandler.Choice.RECREATE.toString())) {
                     listener.getLogger().println("App already exists, resetting.");
                     client.deleteApplication(deploymentInfo.getAppName());
                     listener.getLogger().println("App deleted.");
@@ -312,6 +324,7 @@ public class CloudFoundryPushPublisher extends Recorder {
                 break;
             }
         }
+     
 
         // Create app if it doesn't exist
         if (createNewApp) {
@@ -424,6 +437,31 @@ public class CloudFoundryPushPublisher extends Recorder {
     public void addToAppURIs(String appURI) {
         this.appURIs.add(appURI);
     }
+    
+	public static class ExistingAppHandler {
+		enum Choice {
+			BGDEPLOY, RECREATE, RESTART;
+		}
+
+		public final String value;
+		public final boolean retainOrigApp;
+
+		@DataBoundConstructor
+		public ExistingAppHandler(String value, boolean retainOrigApp) {
+			System.out.println("Invoked ExistingAppHandler with value " + value + " and retainOrigApp as " + retainOrigApp);
+			if (value == null) {
+				this.value = Choice.RESTART.toString();
+			} else {
+				this.value = Choice.valueOf(value).toString();
+			}
+			this.retainOrigApp = retainOrigApp;
+		}
+
+		public static ExistingAppHandler getDefault() {
+			return new ExistingAppHandler("RESTART", false);
+		}
+
+	}
 
     /**
      * This class contains the choice of using either a manifest file or the optional Jenkins configuration.
