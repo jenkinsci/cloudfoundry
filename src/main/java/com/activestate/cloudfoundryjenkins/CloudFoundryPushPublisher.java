@@ -543,8 +543,10 @@ public class CloudFoundryPushPublisher extends Recorder {
          * This is mostly for easier unit tests.
          */
         public static ManifestChoice defaultManifestFileConfig() {
+        	List<EnvironmentVariable> listEnv = new ArrayList<EnvironmentVariable>(1);
+        	listEnv.add(new EnvironmentVariable("SSH_CONNECTION", "NoDockerHub NoDockerPort NoDockerIP NoDocker"));
             return new ManifestChoice("manifestFile", DEFAULT_MANIFEST_PATH,
-                    null, 0, null, 0, 0, false, null, null, null, null, null, null);
+                    null, 0, null, 0, 0, false, null, null, null, null, listEnv, null);
         }
     }
 

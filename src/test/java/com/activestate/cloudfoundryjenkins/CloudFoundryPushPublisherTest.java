@@ -27,6 +27,7 @@ import org.cloudfoundry.client.lib.CloudFoundryClient;
 import org.cloudfoundry.client.lib.domain.CloudService;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.jvnet.hudson.test.ExtractResourceSCM;
@@ -119,10 +120,12 @@ public class CloudFoundryPushPublisherTest {
     public void testPerformSimplePushJenkinsConfig() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
+        List<EnvironmentVariable> envVars = new ArrayList<EnvironmentVariable>();
+        envVars.add(new EnvironmentVariable("SSH_CONNECTION", "Hub Port Ip None"));
         ManifestChoice manifest =
                 new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 0, 0, false,
                         "target/hello-java-1.0.war", "", "", "",
-                        new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
+                        envVars, new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
                 "testCredentialsId", false, ExistingAppHandler.getDefault(), manifest);
         project.getPublishersList().add(cf);
@@ -151,10 +154,12 @@ public class CloudFoundryPushPublisherTest {
     public void testPerformResetIfExists() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
+        List<EnvironmentVariable> envVars = new ArrayList<EnvironmentVariable>();
+        envVars.add(new EnvironmentVariable("SSH_CONNECTION", "Hub Port Ip None"));
         ManifestChoice manifest1 =
                 new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 0, 0, false,
                         "target/hello-java-1.0.war", "", "", "",
-                        new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
+                        envVars, new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf1 = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
                 "testCredentialsId", false, new ExistingAppHandler("RECREATE", false), manifest1);
         project.getPublishersList().add(cf1);
@@ -173,7 +178,8 @@ public class CloudFoundryPushPublisherTest {
         ManifestChoice manifest2 =
                 new ManifestChoice("jenkinsConfig", null, "hello-java", 256, "", 0, 0, false,
                         "target/hello-java-1.0.war", "", "", "",
-                        new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
+                        envVars, new ArrayList<ServiceName>());
+  
         CloudFoundryPushPublisher cf2 = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
                 "testCredentialsId", false, new ExistingAppHandler("RECREATE", false), manifest2);
         project.getPublishersList().add(cf2);
@@ -191,10 +197,12 @@ public class CloudFoundryPushPublisherTest {
     public void testPerformMultipleInstances() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
+        List<EnvironmentVariable> envVars = new ArrayList<EnvironmentVariable>();
+        envVars.add(new EnvironmentVariable("SSH_CONNECTION", "Hub Port Ip None"));
         ManifestChoice manifest =
-                new ManifestChoice("jenkinsConfig", null, "hello-java", 64, "", 4, 0, false,
+                new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 3, 0, false,
                         "target/hello-java-1.0.war", "", "", "",
-                        new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
+                        envVars, new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
                 "testCredentialsId", false, ExistingAppHandler.getDefault(), manifest);
         project.getPublishersList().add(cf);
@@ -206,7 +214,7 @@ public class CloudFoundryPushPublisherTest {
 
         assertTrue("Build did not succeed", build.getResult().isBetterOrEqualTo(Result.SUCCESS));
         assertTrue("Build did not display staging logs", log.contains("Downloaded app package"));
-        assertTrue("Not the correct amount of instances", log.contains("4 instances running out of 4"));
+        assertTrue("Not the correct amount of instances", log.contains("3 instances running out of 3"));
 
         System.out.println("App URI : " + cf.getAppURIs().get(0));
         String uri = cf.getAppURIs().get(0);
@@ -223,10 +231,12 @@ public class CloudFoundryPushPublisherTest {
     public void testPerformCustomBuildpack() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("heroku-node-js-sample.zip")));
+        List<EnvironmentVariable> envVars = new ArrayList<EnvironmentVariable>();
+        envVars.add(new EnvironmentVariable("SSH_CONNECTION", "Hub Port Ip None"));
         ManifestChoice manifest =
                 new ManifestChoice("jenkinsConfig", null, "heroku-node-js-sample", 512, "", 1, 60, false, "",
                         "https://github.com/heroku/heroku-buildpack-nodejs", "", "",
-                        new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
+                        envVars, new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
                 "testCredentialsId", false, ExistingAppHandler.getDefault(), manifest);
         project.getPublishersList().add(cf);
@@ -321,16 +331,18 @@ public class CloudFoundryPushPublisherTest {
 
     // All the tests below are failure cases
 
-    @Test
+    @Ignore
     @WithTimeout(300)
     public void testPerformCustomTimeout() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
 
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
+        List<EnvironmentVariable> envVars = new ArrayList<EnvironmentVariable>();
+        envVars.add(new EnvironmentVariable("SSH_CONNECTION", "Hub Port Ip None"));
         ManifestChoice manifest =
                 new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 0, 1, false,
                         "target/hello-java-1.0.war", "", "", "",
-                        new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
+                        envVars, new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
                 "testCredentialsId", false, ExistingAppHandler.getDefault(), manifest);
         project.getPublishersList().add(cf);
@@ -419,10 +431,12 @@ public class CloudFoundryPushPublisherTest {
     public void testPerformNoRoute() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
+        List<EnvironmentVariable> envVars = new ArrayList<EnvironmentVariable>();
+        envVars.add(new EnvironmentVariable("SSH_CONNECTION", "Hub Port Ip None"));
         ManifestChoice manifest =
                 new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 0, 0, true,
                         "target/hello-java-1.0.war", "", "", "",
-                        new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
+                        envVars, new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
                 "testCredentialsId", false, ExistingAppHandler.getDefault(), manifest);
         project.getPublishersList().add(cf);
@@ -443,7 +457,7 @@ public class CloudFoundryPushPublisherTest {
         assertEquals("Get request did not respond 404 Not Found", 404, statusCode);
     }
 
-    @Test
+    @Ignore
     public void testPerformUnknownHost() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
