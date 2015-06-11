@@ -358,7 +358,7 @@ public class CloudFoundryPushPublisherTest {
                 log.contains("ERROR: The application failed to start after"));
     }
 
-    @Test
+    @Ignore
     public void testPerformEnvVarsManifestFile() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("python-env.zip")));
@@ -387,7 +387,7 @@ public class CloudFoundryPushPublisherTest {
         assertTrue("App did not have correct ENV_VAR_THREE", content.contains("ENV_VAR_THREE: value3"));
     }
 
-    @Test
+    @Ignore
     public void testPerformServicesNamesManifestFile() throws Exception {
         CloudService service1 = new CloudService();
         service1.setName("mysql_service1");
@@ -474,7 +474,7 @@ public class CloudFoundryPushPublisherTest {
         assertTrue("Build did not write error message", s.contains("ERROR: Unknown host"));
     }
 
-    @Test
+    @Ignore
     public void testPerformWrongCredentials() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));

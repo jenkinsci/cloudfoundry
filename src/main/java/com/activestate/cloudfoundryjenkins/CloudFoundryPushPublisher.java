@@ -74,8 +74,6 @@ public class CloudFoundryPushPublisher extends Recorder {
         this.cloudSpace = cloudSpace;
         this.credentialsId = credentialsId;
         this.selfSigned = selfSigned;
-        //this.resetIfExists = resetIfExists;
-        //this.bluegreen = bluegreen;
         if(existingAppHandler == null) {
         	System.out.println(" existingAppHandler is null. Creating default.");
         	this.existingAppHandler = ExistingAppHandler.getDefault();
