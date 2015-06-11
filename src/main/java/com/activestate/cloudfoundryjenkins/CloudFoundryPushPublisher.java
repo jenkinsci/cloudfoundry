@@ -230,6 +230,9 @@ public class CloudFoundryPushPublisher extends Recorder {
 
             // Push files
             listener.getLogger().println("Pushing app bits.");
+            
+            boolean registered = registerForLogStream( client, appName, listener);
+            
             pushAppBits(build, deploymentInfo, client);
 
             // Start or restart application
@@ -243,7 +246,10 @@ public class CloudFoundryPushPublisher extends Recorder {
             }
 
             // Start printing the staging logs
-            printStagingLogs(client, listener, startingInfo, appName);
+            if(!registered) {
+            	printStagingLogs(client, listener, startingInfo, appName);
+            }
+            
 
             CloudApplication app = client.getApplication(appName);
 
@@ -387,14 +393,6 @@ public class CloudFoundryPushPublisher extends Recorder {
 
     private void printStagingLogs(CloudFoundryClient client, BuildListener listener,
                                   StartingInfo startingInfo, String appName) {
-        // First, try streamLogs()
-        try {
-            JenkinsApplicationLogListener logListener = new JenkinsApplicationLogListener(listener);
-            client.streamLogs(appName, logListener);
-        } catch (Exception e) {
-            // In case of failure, try getStagingLogs()
-            listener.getLogger().println("WARNING: Exception occurred trying to get staging logs via websocket. " +
-                    "Switching to alternate method.");
             int offset = 0;
             String stagingLogs = client.getStagingLogs(startingInfo, offset);
             if (stagingLogs == null) {
@@ -407,7 +405,21 @@ public class CloudFoundryPushPublisher extends Recorder {
                     stagingLogs = client.getStagingLogs(startingInfo, offset);
                 }
             }
-        }
+    }
+    
+    private boolean registerForLogStream(CloudFoundryClient client,String appName, BuildListener listener) {
+        boolean success = false;   
+    	try {
+                JenkinsApplicationLogListener logListener = new JenkinsApplicationLogListener(listener);
+                client.streamLogs(appName, logListener);
+                success= true;
+            }
+            catch (Exception ex) {
+            	  // In case of failure, try getStagingLogs()
+                listener.getLogger().println("registerForLogStream: Exception occurred trying to get staging logs via websocket. ");
+            }
+    	return success;
+       
     }
 
     private static HttpProxyConfiguration buildProxyConfiguration(URL targetURL) {
