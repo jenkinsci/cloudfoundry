@@ -4,46 +4,67 @@
 
 package com.activestate.cloudfoundryjenkins;
 
-import com.cloudbees.plugins.credentials.CredentialsMatchers;
-import com.cloudbees.plugins.credentials.CredentialsProvider;
-import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
-import com.cloudbees.plugins.credentials.common.StandardUsernameCredentials;
-import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials;
-import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
 import hudson.ProxyConfiguration;
-import hudson.model.*;
+import hudson.model.BuildListener;
+import hudson.model.ItemGroup;
+import hudson.model.Result;
+import hudson.model.AbstractBuild;
+import hudson.model.AbstractProject;
+import hudson.model.Hudson;
 import hudson.security.ACL;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.BuildStepMonitor;
 import hudson.tasks.Publisher;
 import hudson.tasks.Recorder;
 import hudson.util.FormValidation;
-import hudson.util.ListBoxModel;
 import hudson.util.Secret;
-import jenkins.model.Jenkins;
-import net.lingala.zip4j.core.ZipFile;
-import net.lingala.zip4j.exception.ZipException;
-import org.cloudfoundry.client.lib.*;
-import org.cloudfoundry.client.lib.domain.*;
-import org.cloudfoundry.client.lib.org.springframework.web.client.ResourceAccessException;
-import org.cloudfoundry.client.lib.rest.CloudControllerClient;
-import org.jenkinsci.plugins.tokenmacro.MacroEvaluationException;
-import org.kohsuke.stapler.AncestorInPath;
-import org.kohsuke.stapler.DataBoundConstructor;
-import org.kohsuke.stapler.QueryParameter;
+import hudson.util.ListBoxModel;
 
-import javax.net.ssl.SSLPeerUnverifiedException;
-import java.io.*;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.regex.Pattern;
+
+import javax.net.ssl.SSLPeerUnverifiedException;
+
+import jenkins.model.Jenkins;
+import net.lingala.zip4j.core.ZipFile;
+import net.lingala.zip4j.exception.ZipException;
+
+import org.cloudfoundry.client.lib.CloudCredentials;
+import org.cloudfoundry.client.lib.CloudFoundryClient;
+import org.cloudfoundry.client.lib.CloudFoundryException;
+import org.cloudfoundry.client.lib.HttpProxyConfiguration;
+import org.cloudfoundry.client.lib.StartingInfo;
+import org.cloudfoundry.client.lib.domain.CloudApplication;
+import org.cloudfoundry.client.lib.domain.InstanceInfo;
+import org.cloudfoundry.client.lib.domain.InstanceState;
+import org.cloudfoundry.client.lib.domain.InstancesInfo;
+import org.cloudfoundry.client.lib.domain.Staging;
+import org.cloudfoundry.client.lib.org.springframework.web.client.ResourceAccessException;
+import org.jenkinsci.plugins.tokenmacro.MacroEvaluationException;
+import org.kohsuke.stapler.AncestorInPath;
+import org.kohsuke.stapler.DataBoundConstructor;
+import org.kohsuke.stapler.QueryParameter;
+
+import com.cloudbees.plugins.credentials.CredentialsMatchers;
+import com.cloudbees.plugins.credentials.CredentialsProvider;
+import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
+import com.cloudbees.plugins.credentials.common.StandardUsernameCredentials;
+import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials;
+import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
 
 public class CloudFoundryPushPublisher extends Recorder {
 
@@ -196,156 +217,169 @@ public class CloudFoundryPushPublisher extends Recorder {
     }
 
     private boolean processOneApp(CloudFoundryClient client, DeploymentInfo deploymentInfo, AbstractBuild build,
-                                  BuildListener listener, URL targetUrl) throws IOException, InterruptedException {
-        try {
-            String appName = deploymentInfo.getAppName();
-            String appURI = "https://" + deploymentInfo.getHostname() + "." + deploymentInfo.getDomain();
-            addToAppURIs(appURI);
+ BuildListener listener, URL targetUrl) throws IOException,
+			InterruptedException {
+		try {
+			String OrigAppURI = "https://" + deploymentInfo.getHostName() + "." + deploymentInfo.getDomain();
+			listener.getLogger().println("Pushing " + deploymentInfo.getAppName() + " app to " + target);
 
-            listener.getLogger().println("Pushing " + appName + " app to " + target);
+			// This is where we would create services, if we decide to add that feature.
+			// List<CloudService> cloudServices = deploymentInfo.getServices();
+			// client.createService();
+			 handleExistingAppAndUpdateDeploymentInfo(client, listener, deploymentInfo);
+			String appURI = "https://" + deploymentInfo.getHostName() + "." + deploymentInfo.getDomain();
+			
+			addToAppURIs(appURI);
+			addToAppURIs(OrigAppURI);
+			if (deploymentInfo.isNewAppToBeCreated()) {
+				// Create app if it doesn't already exist, or if resetIfExists parameter is true
+				createApplication(client, listener, deploymentInfo, appURI);
+			}
+			String appName = deploymentInfo.getAppName();
+			// Unbind all routes if no-route parameter is set
+			if (deploymentInfo.isNoRoute()) {
+				client.updateApplicationUris(appName, new ArrayList<String>());
+			}
 
-            // This is where we would create services, if we decide to add that feature.
-            // List<CloudService> cloudServices = deploymentInfo.getServices();
-            // client.createService();
+			// Add environment variables
+			if (!deploymentInfo.getEnvVars().isEmpty()) {
+				client.updateApplicationEnv(appName, deploymentInfo.getEnvVars());
+			}
+			
+			// Change number of instances
+			if (deploymentInfo.getInstances() > 1) {
+				client.updateApplicationInstances(appName, deploymentInfo.getInstances());
+			}
+			// Push files
+			listener.getLogger().println("Pushing app bits.");
 
-            // Create app if it doesn't already exist, or if resetIfExists parameter is true
-            boolean createdNewApp = createApplicationIfNeeded(client, listener, deploymentInfo, appURI);
+			boolean registered = registerForLogStream(client, appName, listener);
 
-            // Unbind all routes if no-route parameter is set
-            if (deploymentInfo.isNoRoute()) {
-                client.updateApplicationUris(appName, new ArrayList<String>());
-            }
+			pushAppBits(build, deploymentInfo, client);
+			
+			//Assigning the Original Route To Green Deployment
+			//TODO: Need a better way to do same as during 
+			addRouteToApplication(client, deploymentInfo.getAppName(), OrigAppURI);
+			// Start or restart application
+			StartingInfo startingInfo;
+			if (deploymentInfo.isNewAppToBeCreated()) {
+				listener.getLogger().println("Starting application.");
+				startingInfo = client.startApplication(appName);
+			} else {
+				listener.getLogger().println("Restarting application.");
+				startingInfo = client.restartApplication(appName);
+			}
 
-            // Add environment variables
-            if (!deploymentInfo.getEnvVars().isEmpty()) {
-                client.updateApplicationEnv(appName, deploymentInfo.getEnvVars());
-            }
+			// Start printing the staging logs
+			if (!registered) {
+				printStagingLogs(client, listener, startingInfo, appName);
+			}
 
-            // Change number of instances
-            if (deploymentInfo.getInstances() > 1) {
-                client.updateApplicationInstances(appName, deploymentInfo.getInstances());
-            }
+			CloudApplication app = client.getApplication(appName);
 
-            // Push files
-            listener.getLogger().println("Pushing app bits.");
-            
-            boolean registered = registerForLogStream( client, appName, listener);
-            
-            pushAppBits(build, deploymentInfo, client);
+			// Keep checking to see if the app is running
+			int running = 0;
+			int totalInstances = 0;
+			for (int tries = 0; tries < TIMEOUT; tries++) {
+				running = 0;
+				InstancesInfo instancesInfo = client.getApplicationInstances(app);
+				if (instancesInfo != null) {
+					List<InstanceInfo> listInstances = instancesInfo.getInstances();
+					totalInstances = listInstances.size();
+					for (InstanceInfo instance : listInstances) {
+						if (instance.getState() == InstanceState.RUNNING) {
+							running++;
+						}
+					}
+					if (running == totalInstances && totalInstances > 0) {
+						break;
+					}
+				}
+				Thread.sleep(1000);
+			}
 
-            // Start or restart application
-            StartingInfo startingInfo;
-            if (createdNewApp) {
-                listener.getLogger().println("Starting application.");
-                startingInfo = client.startApplication(appName);
-            } else {
-                listener.getLogger().println("Restarting application.");
-                startingInfo = client.restartApplication(appName);
-            }
+			String instanceGrammar = "instances";
+			if (running == 1)
+				instanceGrammar = "instance";
+			listener.getLogger().println(running + " " + instanceGrammar + " running out of " + totalInstances);
 
-            // Start printing the staging logs
-            if(!registered) {
-            	printStagingLogs(client, listener, startingInfo, appName);
-            }
-            
+			if (running > 0) {
+				if (running != totalInstances) {
+					listener.getLogger().println("WARNING: Some instances of the application are not running.");
+				}
+				if (deploymentInfo.isNoRoute()) {
+					listener.getLogger().println("Application is now running. (No route)");
+				} else {
+					listener.getLogger().println("Application is now running at " + appURI);
+				}
+				listener.getLogger().println("Cloud Foundry push successful.");
+				return true;
+			} else {
+				listener.getLogger().println("ERROR: The application failed to start after " + TIMEOUT + " seconds.");
+				listener.getLogger().println("Cloud Foundry push failed.");
+				return false;
+			}
+		} catch (CloudFoundryException e) {
+			listener.getLogger().println("ERROR: Unknown CloudFoundryException: " + e.getMessage());
+			listener.getLogger().println("ERROR: Cloud Foundry error code: " + e.getCloudFoundryErrorCode());
+			if (e.getDescription() != null) {
+				listener.getLogger().println("ERROR: " + e.getDescription());
+			}
+			e.printStackTrace(listener.getLogger());
+			return false;
+		} catch (FileNotFoundException e) {
+			listener.getLogger().println("ERROR: Could not find file: " + e.getMessage());
+			return false;
+		} catch (ZipException e) {
+			listener.getLogger().println("ERROR: ZipException: " + e.getMessage());
+			return false;
+		}
+	}
 
-            CloudApplication app = client.getApplication(appName);
+    private void createApplication(CloudFoundryClient client, BuildListener listener,
+ DeploymentInfo deploymentInfo, String appURI) {
+		// Create app if it doesn't exist
+		listener.getLogger().println("Creating new app.");
+		Staging staging = new Staging(deploymentInfo.getCommand(), deploymentInfo.getBuildpack(), null, deploymentInfo.getTimeout());
+		List<String> uris = new ArrayList<String>();
+		// Pass an empty List as the uri list if no-route is set
+		if (!deploymentInfo.isNoRoute()) {
+			uris.add(appURI);
+		}
+		List<String> services = deploymentInfo.getServicesNames();
+		client.createApplication(deploymentInfo.getAppName(), staging, deploymentInfo.getMemory(), uris, services);
 
-            // Keep checking to see if the app is running
-            int running = 0;
-            int totalInstances = 0;
-            for (int tries = 0; tries < TIMEOUT; tries++) {
-                running = 0;
-                InstancesInfo instancesInfo = client.getApplicationInstances(app);
-                if (instancesInfo != null) {
-                    List<InstanceInfo> listInstances = instancesInfo.getInstances();
-                    totalInstances = listInstances.size();
-                    for (InstanceInfo instance : listInstances) {
-                        if (instance.getState() == InstanceState.RUNNING) {
-                            running++;
-                        }
-                    }
-                    if (running == totalInstances && totalInstances > 0) {
-                        break;
-                    }
-                }
-                Thread.sleep(1000);
-            }
+	}
 
-            String instanceGrammar = "instances";
-            if (running == 1)
-                instanceGrammar = "instance";
-            listener.getLogger().println(running + " " + instanceGrammar + " running out of " + totalInstances);
-
-            if (running > 0) {
-                if (running != totalInstances) {
-                    listener.getLogger().println("WARNING: Some instances of the application are not running.");
-                }
-                if (deploymentInfo.isNoRoute()) {
-                    listener.getLogger().println("Application is now running. (No route)");
-                } else {
-                    listener.getLogger().println("Application is now running at " + appURI);
-                }
-                listener.getLogger().println("Cloud Foundry push successful.");
-                return true;
-            } else {
-                listener.getLogger().println("ERROR: The application failed to start after " + TIMEOUT + " seconds.");
-                listener.getLogger().println("Cloud Foundry push failed.");
-                return false;
-            }
-        } catch (CloudFoundryException e) {
-            listener.getLogger().println("ERROR: Unknown CloudFoundryException: " + e.getMessage());
-            listener.getLogger().println("ERROR: Cloud Foundry error code: " + e.getCloudFoundryErrorCode());
-            if (e.getDescription() != null) {
-                listener.getLogger().println("ERROR: " + e.getDescription());
-            }
-            e.printStackTrace(listener.getLogger());
-            return false;
-        } catch (FileNotFoundException e) {
-            listener.getLogger().println("ERROR: Could not find file: " + e.getMessage());
-            return false;
-        } catch (ZipException e) {
-            listener.getLogger().println("ERROR: ZipException: " + e.getMessage());
-            return false;
-        }
-    }
-
-    private boolean createApplicationIfNeeded(CloudFoundryClient client, BuildListener listener,
-                                              DeploymentInfo deploymentInfo, String appURI) {
-        // Check if app already exists
-        List<CloudApplication> existingApps = client.getApplications();
-        boolean createNewApp = true;
-        for (CloudApplication app : existingApps) {
-            if (app.getName().equals(deploymentInfo.getAppName())) {
-                if (existingAppHandler.value.equals(ExistingAppHandler.Choice.RECREATE.toString())) {
-                    listener.getLogger().println("App already exists, resetting.");
-                    client.deleteApplication(deploymentInfo.getAppName());
-                    listener.getLogger().println("App deleted.");
-                } else {
-                    createNewApp = false;
-                    listener.getLogger().println("App already exists, skipping creation.");
-                }
-                break;
-            }
-        }
-     
-
-        // Create app if it doesn't exist
-        if (createNewApp) {
-            listener.getLogger().println("Creating new app.");
-            Staging staging = new Staging(deploymentInfo.getCommand(), deploymentInfo.getBuildpack(),
-                    null, deploymentInfo.getTimeout());
-            List<String> uris = new ArrayList<String>();
-            // Pass an empty List as the uri list if no-route is set
-            if (!deploymentInfo.isNoRoute()) {
-                uris.add(appURI);
-            }
-            List<String> services = deploymentInfo.getServicesNames();
-            client.createApplication(deploymentInfo.getAppName(), staging, deploymentInfo.getMemory(), uris, services);
-        }
-
-        return createNewApp;
-    }
+	protected void handleExistingAppAndUpdateDeploymentInfo(CloudFoundryClient client, BuildListener listener, DeploymentInfo deploymentInfo) {
+		// Check if app already exist
+		List<CloudApplication> existingApps = client.getApplications();
+		boolean createNewApp = true;
+		String appName = deploymentInfo.getAppName();
+		String appHostName = deploymentInfo.getHostName();
+		
+		for (CloudApplication app : existingApps) {
+			if (app.getName().equals(appName)) {
+				if (existingAppHandler.value.equals(ExistingAppHandler.Choice.RECREATE.toString())) {
+					listener.getLogger().println("App already exists, resetting.");
+					client.deleteApplication(deploymentInfo.getAppName());
+					listener.getLogger().println("App deleted.");
+				} else if (existingAppHandler.value.equals(ExistingAppHandler.Choice.RESTART.toString())) {
+					createNewApp = false;
+					listener.getLogger().println("App already exists, skipping creation.");
+				} else if (existingAppHandler.value.equals(ExistingAppHandler.Choice.BGDEPLOY.toString())) {
+					String suffix = UUID.randomUUID().toString();
+					String greenAppName = appName + "-" + suffix;
+					String greenAppHostname = appHostName + "-" + suffix;
+					deploymentInfo.setAppName(greenAppName);
+					deploymentInfo.setHostname(greenAppHostname);
+				}
+				break;
+			}
+		}
+		
+		deploymentInfo.setNewAppToBeCreated(createNewApp);
+	}
 
     private void pushAppBits(AbstractBuild build, DeploymentInfo deploymentInfo, CloudFoundryClient client)
             throws IOException, InterruptedException, ZipException {
@@ -724,6 +758,21 @@ public class CloudFoundryPushPublisher extends Recorder {
         @SuppressWarnings("unused")
         public FormValidation doCheckHostname(@QueryParameter String value) {
             return FormValidation.validateRequired(value);
+        }
+    }
+    /**
+     * Adds a route to an existing application.
+     * @param client
+     * @param appName
+     * @param newRoute
+     */
+    public static void addRouteToApplication(CloudFoundryClient client, String appName, String newRoute) {
+        try {
+            List<String> routes = client.getApplication(appName).getUris();
+            routes.add(newRoute);
+            client.updateApplicationUris(appName, routes);
+        } catch (CloudFoundryException e) {
+            e.getMessage();
         }
     }
 }
