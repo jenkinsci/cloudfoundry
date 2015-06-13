@@ -230,9 +230,8 @@ public class CloudFoundryPushPublisher extends Recorder {
 			String appURI = "https://" + deploymentInfo.getHostName() + "." + deploymentInfo.getDomain();
 			
 			addToAppURIs(appURI);
-			addToAppURIs(OrigAppURI);
 			if (deploymentInfo.isNewAppToBeCreated()) {
-				// Create app if it doesn't already exist, or if resetIfExists parameter is true
+				// Create app if it doesn't already exist, or if 'delete existing app and create new' flag parameter is true
 				createApplication(client, listener, deploymentInfo, appURI);
 			}
 			String appName = deploymentInfo.getAppName();
@@ -256,10 +255,6 @@ public class CloudFoundryPushPublisher extends Recorder {
 			boolean registered = registerForLogStream(client, appName, listener);
 
 			pushAppBits(build, deploymentInfo, client);
-			
-			//Assigning the Original Route To Green Deployment
-			//TODO: Need a better way to do same as during 
-			addRouteToApplication(client, deploymentInfo.getAppName(), OrigAppURI);
 			// Start or restart application
 			StartingInfo startingInfo;
 			if (deploymentInfo.isNewAppToBeCreated()) {
@@ -313,6 +308,12 @@ public class CloudFoundryPushPublisher extends Recorder {
 					listener.getLogger().println("Application is now running at " + appURI);
 				}
 				listener.getLogger().println("Cloud Foundry push successful.");
+				if (deploymentInfo.isBlueGreenInitiated()) {
+					// Assigning the Original Route To Green Deployment
+					addRouteToApplication(client, deploymentInfo.getAppName(), OrigAppURI);
+					client.updateApplicationUris(deploymentInfo.getOrigAppName(), new ArrayList<String>());//Need to check if more routes exists  
+				}
+				
 				return true;
 			} else {
 				listener.getLogger().println("ERROR: The application failed to start after " + TIMEOUT + " seconds.");
@@ -372,12 +373,13 @@ public class CloudFoundryPushPublisher extends Recorder {
 					String greenAppName = appName + "-" + suffix;
 					String greenAppHostname = appHostName + "-" + suffix;
 					deploymentInfo.setAppName(greenAppName);
-					deploymentInfo.setHostname(greenAppHostname);
+					deploymentInfo.setHostName(greenAppHostname);
+					deploymentInfo.setBlueGreenInitiated(true);
 				}
 				break;
 			}
 		}
-		
+		deploymentInfo.setOrigAppName(appName);
 		deploymentInfo.setNewAppToBeCreated(createNewApp);
 	}
 
@@ -480,6 +482,9 @@ public class CloudFoundryPushPublisher extends Recorder {
 
     public void addToAppURIs(String appURI) {
         this.appURIs.add(appURI);
+    }
+    public void removeToAppURIs(String appURI) {
+        this.appURIs.remove(appURI);
     }
     
     public static class ExistingAppHandler {

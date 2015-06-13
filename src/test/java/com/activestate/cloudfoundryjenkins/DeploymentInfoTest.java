@@ -44,7 +44,7 @@ public class DeploymentInfoTest {
 
         assertEquals("hello-java", deploymentInfo.getAppName());
         assertEquals(512, deploymentInfo.getMemory());
-        assertEquals("testhost", deploymentInfo.getHostname());
+        assertEquals("testhost", deploymentInfo.getHostName());
         assertEquals(4, deploymentInfo.getInstances());
         assertEquals(42, deploymentInfo.getTimeout());
         assertEquals(true, deploymentInfo.isNoRoute());
@@ -77,7 +77,7 @@ public class DeploymentInfoTest {
 
         assertEquals("jenkins-build-name", deploymentInfo.getAppName());
         assertEquals(DEFAULT_MEMORY, deploymentInfo.getMemory());
-        assertEquals("jenkins-build-name", deploymentInfo.getHostname());
+        assertEquals("jenkins-build-name", deploymentInfo.getHostName());
         assertEquals(DEFAULT_INSTANCES, deploymentInfo.getInstances());
         assertEquals(DEFAULT_TIMEOUT, deploymentInfo.getTimeout());
         assertEquals(false, deploymentInfo.isNoRoute());
@@ -127,7 +127,7 @@ public class DeploymentInfoTest {
 
         assertEquals("hello-java", deploymentInfo.getAppName());
         assertEquals(512, deploymentInfo.getMemory());
-        assertEquals("testhost", deploymentInfo.getHostname());
+        assertEquals("testhost", deploymentInfo.getHostName());
         assertEquals(4, deploymentInfo.getInstances());
         assertEquals(42, deploymentInfo.getTimeout());
         assertEquals(true, deploymentInfo.isNoRoute());
@@ -158,7 +158,7 @@ public class DeploymentInfoTest {
 
         assertEquals("jenkins-build-name", deploymentInfo.getAppName());
         assertEquals(DEFAULT_MEMORY, deploymentInfo.getMemory());
-        assertEquals("jenkins-build-name", deploymentInfo.getHostname());
+        assertEquals("jenkins-build-name", deploymentInfo.getHostName());
         assertEquals(DEFAULT_INSTANCES, deploymentInfo.getInstances());
         assertEquals(DEFAULT_TIMEOUT, deploymentInfo.getTimeout());
         assertEquals(false, deploymentInfo.isNoRoute());
