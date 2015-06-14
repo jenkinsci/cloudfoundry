@@ -476,9 +476,6 @@ public class CloudFoundryPushPublisher extends Recorder {
     public void addToAppURIs(String appURI) {
         this.appURIs.add(appURI);
     }
-    public void removeToAppURIs(String appURI) {
-        this.appURIs.remove(appURI);
-    }
     
     public static class ExistingAppHandler {
     	enum Choice {
