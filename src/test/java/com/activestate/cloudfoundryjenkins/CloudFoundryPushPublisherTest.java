@@ -495,4 +495,51 @@ public class CloudFoundryPushPublisherTest {
         assertTrue("Build succeeded where it should have failed", build.getResult().isWorseOrEqualTo(Result.FAILURE));
         assertTrue("Build did not write error message", s.contains("ERROR: Wrong username or password"));
     }
+    
+    @Test
+	public void testPerformBGPushManifestFile() throws Exception {
+
+    	FreeStyleProject project = j.createFreeStyleProject();
+		project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
+		CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE, "testCredentialsId", false, new ExistingAppHandler("BGDEPLOY", false),
+				ManifestChoice.defaultManifestFileConfig());
+		project.getPublishersList().add(cf);
+		
+		FreeStyleBuild build = project.scheduleBuild2(0).get();
+		System.out.println(build.getDisplayName()  +" completed");
+		String log = FileUtils.readFileToString(build.getLogFile());
+		System.out.println(log);
+		assertTrue("Blue Deployment Build did not succeed", build.getResult().isBetterOrEqualTo(Result.SUCCESS));
+		assertTrue("Blue Deployment Build did not display staging logs", log.contains("Downloaded app package"));
+
+		// Verifying Orig Route to Orig App Is Correct
+		System.out.println("Blue App URI : "+  cf.getAppURIs().get(0));
+		String uri = cf.getAppURIs().get(0);
+		Request request = Request.Get(uri);
+		HttpResponse response = request.execute().returnResponse();
+		int statusCode = response.getStatusLine().getStatusCode();
+		assertEquals("Blue App  Get request did not respond 200 OK", 200, statusCode);
+		String content = EntityUtils.toString(response.getEntity());
+		System.out.println(content);
+		assertTrue("Blue App did not send back correct text", content.contains("Hello from"));
+		
+		build = project.scheduleBuild2(0).get();
+		System.out.println(build.getDisplayName() + " completed");
+		log = FileUtils.readFileToString(build.getLogFile());
+		System.out.println(log);
+		assertTrue("Green Deployment Build did not succeed", build.getResult().isBetterOrEqualTo(Result.SUCCESS));
+		assertTrue("Green Deployment Build did not display staging logs", log.contains("Downloaded app package"));
+		
+		// Verifying New Route to Green Deployment App Is Correct
+		System.out.println("Green App URI : " + cf.getAppURIs().get(1));
+		uri = cf.getAppURIs().get(1);
+		request = Request.Get(uri);
+		response = request.execute().returnResponse();
+		statusCode = response.getStatusLine().getStatusCode();
+		assertEquals("Green App Get request did not respond 200 OK", 200, statusCode);
+		String content1 = EntityUtils.toString(response.getEntity());
+		System.out.println(content1);
+		assertTrue("Green App did not send back correct text", content1.contains("Hello from"));
+
+	}
 }

@@ -42,6 +42,8 @@ public class DeploymentInfo {
 
     private Map<String, String> envVars = new HashMap<String, String>();
     private List<String> servicesNames = new ArrayList<String>();
+	private boolean isBGDeployment;
+	private boolean createNewApp;
 
     /**
      * Constructor for reading the manifest.yml file.
@@ -325,5 +327,31 @@ public class DeploymentInfo {
     public List<String> getServicesNames() {
         return servicesNames;
     }
+
+	public void setAppName(String appName) {
+		this.appName = appName;
+	}
+
+	public void setHostname(String hostname) {
+		this.hostname = hostname;
+	}
+
+	public void setBGDeployment(boolean bgdeploy) {
+		this.isBGDeployment = bgdeploy ;
+		
+	}
+
+	public boolean isBGDeployment() {
+		return isBGDeployment;
+	}
+
+	public void setCreateNewApp(boolean createApp) {
+		this.createNewApp = createApp;
+		
+	}
+	
+	public boolean isCreateNewApp() {
+		return createNewApp;
+	}
 
 }

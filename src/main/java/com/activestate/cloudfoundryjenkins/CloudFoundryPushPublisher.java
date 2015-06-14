@@ -10,6 +10,7 @@ import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
 import com.cloudbees.plugins.credentials.common.StandardUsernameCredentials;
 import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials;
 import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
+
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
@@ -26,16 +27,17 @@ import hudson.util.Secret;
 import jenkins.model.Jenkins;
 import net.lingala.zip4j.core.ZipFile;
 import net.lingala.zip4j.exception.ZipException;
+
 import org.cloudfoundry.client.lib.*;
 import org.cloudfoundry.client.lib.domain.*;
 import org.cloudfoundry.client.lib.org.springframework.web.client.ResourceAccessException;
-import org.cloudfoundry.client.lib.rest.CloudControllerClient;
 import org.jenkinsci.plugins.tokenmacro.MacroEvaluationException;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 
 import javax.net.ssl.SSLPeerUnverifiedException;
+
 import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -43,6 +45,7 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 public class CloudFoundryPushPublisher extends Recorder {
@@ -191,6 +194,12 @@ public class CloudFoundryPushPublisher extends Recorder {
             return false;
         } catch (Exception e) {
             e.printStackTrace(listener.getLogger());
+            e.printStackTrace();
+            return false;
+        }
+        catch (Throwable th) {
+            th.printStackTrace(listener.getLogger());
+            th.printStackTrace();
             return false;
         }
     }
@@ -198,18 +207,35 @@ public class CloudFoundryPushPublisher extends Recorder {
     private boolean processOneApp(CloudFoundryClient client, DeploymentInfo deploymentInfo, AbstractBuild build,
                                   BuildListener listener, URL targetUrl) throws IOException, InterruptedException {
         try {
-            String appName = deploymentInfo.getAppName();
-            String appURI = "https://" + deploymentInfo.getHostname() + "." + deploymentInfo.getDomain();
-            addToAppURIs(appURI);
+            
 
-            listener.getLogger().println("Pushing " + appName + " app to " + target);
+            listener.getLogger().println("Processing " + deploymentInfo.getAppName());
 
             // This is where we would create services, if we decide to add that feature.
             // List<CloudService> cloudServices = deploymentInfo.getServices();
             // client.createService();
+            
+            CloudApplication existingApp = client.getApplication(deploymentInfo.getAppName());
+            System.out.println("Existing app with the same name : "+existingApp);
+            handleExistingApp(client,listener,existingApp);
+            updateDeploymentInfo(existingApp, listener, deploymentInfo);
+            
+            String appName = deploymentInfo.getAppName();
+            String appURI = "https://" + appName+ "." + deploymentInfo.getDomain();
+            
+            listener.getLogger().println("Pushing " + appName+ " with URI "+ appURI+" to " + target);
+            System.out.println("Pushing " + appName+ " with URI "+ appURI+" to " + target);
 
-            // Create app if it doesn't already exist, or if resetIfExists parameter is true
-            boolean createdNewApp = createApplicationIfNeeded(client, listener, deploymentInfo, appURI);
+            addToAppURIs(appURI);
+            
+            if(deploymentInfo.isCreateNewApp())
+            {
+            	createApplication(client, listener, deploymentInfo, appURI);
+            	 System.out.println("Created new application with route "+appURI);
+
+            }
+            
+            boolean registered = registerForLogStream( client, appName, listener);
 
             // Unbind all routes if no-route parameter is set
             if (deploymentInfo.isNoRoute()) {
@@ -229,13 +255,11 @@ public class CloudFoundryPushPublisher extends Recorder {
             // Push files
             listener.getLogger().println("Pushing app bits.");
             
-            boolean registered = registerForLogStream( client, appName, listener);
-            
             pushAppBits(build, deploymentInfo, client);
 
             // Start or restart application
             StartingInfo startingInfo;
-            if (createdNewApp) {
+            if (deploymentInfo.isCreateNewApp()) {
                 listener.getLogger().println("Starting application.");
                 startingInfo = client.startApplication(appName);
             } else {
@@ -310,42 +334,53 @@ public class CloudFoundryPushPublisher extends Recorder {
         }
     }
 
-    private boolean createApplicationIfNeeded(CloudFoundryClient client, BuildListener listener,
-                                              DeploymentInfo deploymentInfo, String appURI) {
-        // Check if app already exists
-        List<CloudApplication> existingApps = client.getApplications();
-        boolean createNewApp = true;
-        for (CloudApplication app : existingApps) {
-            if (app.getName().equals(deploymentInfo.getAppName())) {
-                if (existingAppHandler.value.equals(ExistingAppHandler.Choice.RECREATE.toString())) {
-                    listener.getLogger().println("App already exists, resetting.");
-                    client.deleteApplication(deploymentInfo.getAppName());
-                    listener.getLogger().println("App deleted.");
-                } else {
-                    createNewApp = false;
-                    listener.getLogger().println("App already exists, skipping creation.");
-                }
-                break;
-            }
+    private void handleExistingApp(CloudFoundryClient client,
+			BuildListener listener, CloudApplication app) {
+    	if(null == app) {
+    		return;
+    	}
+    		
+    	if (existingAppHandler.value.equals(ExistingAppHandler.Choice.RECREATE.toString())) {
+            listener.getLogger().println("App already exists, resetting.");
+            client.deleteApplication(app.getName());
+            listener.getLogger().println("App deleted.");
+        } 
+	}
+    
+    private void updateDeploymentInfo(CloudApplication app, BuildListener listener, DeploymentInfo deploymentInfo) {
+    	if(null == app) {
+    		deploymentInfo.setCreateNewApp(true);
+    		return;
+    	}
+    	
+    	 if( existingAppHandler.value.equals(ExistingAppHandler.Choice.BGDEPLOY.toString())) {
+    		String appName = app.getName();
+    	    String appHostname = deploymentInfo.getHostname();
+            listener.getLogger().println("App already exists, Blue/Green deployment scenario");
+            String suffix = UUID.randomUUID().toString();
+			String greenAppName = appName + "-" + suffix;
+			String greenAppHostname = appHostname + "-" + suffix;
+			deploymentInfo.setAppName(greenAppName);
+			deploymentInfo.setHostname(greenAppHostname);
+			deploymentInfo.setCreateNewApp(true);
+			deploymentInfo.setBGDeployment(true);
         }
-     
-
-        // Create app if it doesn't exist
-        if (createNewApp) {
-            listener.getLogger().println("Creating new app.");
-            Staging staging = new Staging(deploymentInfo.getCommand(), deploymentInfo.getBuildpack(),
-                    null, deploymentInfo.getTimeout());
-            List<String> uris = new ArrayList<String>();
-            // Pass an empty List as the uri list if no-route is set
-            if (!deploymentInfo.isNoRoute()) {
-                uris.add(appURI);
-            }
-            List<String> services = deploymentInfo.getServicesNames();
-            client.createApplication(deploymentInfo.getAppName(), staging, deploymentInfo.getMemory(), uris, services);
-        }
-
-        return createNewApp;
+		
     }
+
+	private void createApplication(CloudFoundryClient client,
+			BuildListener listener, DeploymentInfo deploymentInfo, String appURI) {
+		listener.getLogger().println("Creating new app.");
+		Staging staging = new Staging(deploymentInfo.getCommand(), deploymentInfo.getBuildpack(),
+		        null, deploymentInfo.getTimeout());
+		List<String> uris = new ArrayList<String>();
+		// Pass an empty List as the uri list if no-route is set
+		if (!deploymentInfo.isNoRoute()) {
+		    uris.add(appURI);
+		}
+		List<String> services = deploymentInfo.getServicesNames();
+		client.createApplication(deploymentInfo.getAppName(), staging, deploymentInfo.getMemory(), uris, services);
+	}
 
     private void pushAppBits(AbstractBuild build, DeploymentInfo deploymentInfo, CloudFoundryClient client)
             throws IOException, InterruptedException, ZipException {
