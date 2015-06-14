@@ -39,6 +39,9 @@ public class DeploymentInfo {
     private String buildpack;
     private String command;
     private String domain;
+    private  boolean  isNewAppToBeCreated  = false;
+    private String origAppName;
+    private boolean isBlueGreenInitiated = false;
 
     private Map<String, String> envVars = new HashMap<String, String>();
     private List<String> servicesNames = new ArrayList<String>();
@@ -286,7 +289,7 @@ public class DeploymentInfo {
         return memory;
     }
 
-    public String getHostname() {
+    public String getHostName() {
         return hostname;
     }
 
@@ -326,4 +329,58 @@ public class DeploymentInfo {
         return servicesNames;
     }
 
+    /**
+	 * @param appName
+	 *            the appName to set
+	 */
+	public void setAppName(String appName) {
+		this.appName = appName;
+	}
+
+	/**
+	 * @param hostname
+	 *            the hostname to set
+	 */
+	public void setHostName(String hostname) {
+		this.hostname = hostname;
+	}
+	/**
+	 * @return the isNewAppToBeCreated
+	 */
+	public boolean isNewAppToBeCreated() {
+		return isNewAppToBeCreated;
+	}
+
+	/**
+	 * @param isNewAppToBeCreated the isNewAppToBeCreated to set
+	 */
+	public void setNewAppToBeCreated(boolean isNewAppToBeCreated) {
+		this.isNewAppToBeCreated = isNewAppToBeCreated;
+	}
+	/**
+	 * @return the origAppName
+	 */
+	public String getOrigAppName() {
+		return origAppName;
+	}
+
+	/**
+	 * @param origAppName the origAppName to set
+	 */
+	public void setOrigAppName(String origAppName) {
+		this.origAppName = origAppName;
+	}
+	/**
+	 * @return the isBlueGreenInitiated
+	 */
+	public boolean isBlueGreenInitiated() {
+		return isBlueGreenInitiated;
+	}
+
+	/**
+	 * @param isBlueGreenInitiated the isBlueGreenInitiated to set
+	 */
+	public void setBlueGreenInitiated(boolean isBlueGreenInitiated) {
+		this.isBlueGreenInitiated = isBlueGreenInitiated;
+	}
 }

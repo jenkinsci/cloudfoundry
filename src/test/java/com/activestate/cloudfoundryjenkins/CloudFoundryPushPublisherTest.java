@@ -358,7 +358,7 @@ public class CloudFoundryPushPublisherTest {
                 log.contains("ERROR: The application failed to start after"));
     }
 
-    @Ignore
+    @Ignore 
     public void testPerformEnvVarsManifestFile() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("python-env.zip")));
@@ -387,7 +387,7 @@ public class CloudFoundryPushPublisherTest {
         assertTrue("App did not have correct ENV_VAR_THREE", content.contains("ENV_VAR_THREE: value3"));
     }
 
-    @Ignore
+    @Ignore 
     public void testPerformServicesNamesManifestFile() throws Exception {
         CloudService service1 = new CloudService();
         service1.setName("mysql_service1");
@@ -427,7 +427,7 @@ public class CloudFoundryPushPublisherTest {
         assertTrue("App did not have mysql_service2 bound", content.contains("mysql_service2"));
     }
 
-    @Test
+    @Ignore
     public void testPerformNoRoute() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
@@ -495,4 +495,64 @@ public class CloudFoundryPushPublisherTest {
         assertTrue("Build succeeded where it should have failed", build.getResult().isWorseOrEqualTo(Result.FAILURE));
         assertTrue("Build did not write error message", s.contains("ERROR: Wrong username or password"));
     }
+    
+    @Test
+    //TODO:Need to refactor this test case
+	public void testPerformBGPushManifestFile() throws Exception {
+		FreeStyleProject project = j.createFreeStyleProject();
+		project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
+
+		CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE, "testCredentialsId", false, new ExistingAppHandler("BGDEPLOY", false),
+				ManifestChoice.defaultManifestFileConfig());
+		project.getPublishersList().add(cf);
+		FreeStyleBuild build = project.scheduleBuild2(0).get();
+		System.out.println(build.getDisplayName() + " completed");
+
+		String log = FileUtils.readFileToString(build.getLogFile());
+		System.out.println(log);
+
+		assertTrue("Blue Deployment Build did not succeed", build.getResult().isBetterOrEqualTo(Result.SUCCESS));
+		assertTrue("Blue Deployment Build did not display staging logs", log.contains("Downloaded app package"));
+
+		// Verifying Orig Route to Orig App Is Correct
+		System.out.println("App URI : " + cf.getAppURIs().get(0));
+		String uri = cf.getAppURIs().get(0);
+		Request request = Request.Get(uri);
+		HttpResponse response = request.execute().returnResponse();
+		int statusCode = response.getStatusLine().getStatusCode();
+		assertEquals("Get request did not respond 200 OK", 200, statusCode);
+		String content = EntityUtils.toString(response.getEntity());
+		System.out.println(content);
+
+		assertTrue("App did not send back correct text", content.contains("Hello from"));
+		FreeStyleBuild build2 = project.scheduleBuild2(0).get();
+		System.out.println(build2.getDisplayName() + " completed");
+
+		String log2 = FileUtils.readFileToString(build.getLogFile());
+		System.out.println(log2);
+
+		assertTrue("Green Deployment Build did not succeed", build2.getResult().isBetterOrEqualTo(Result.SUCCESS));
+		assertTrue("Green Deployment Build did not display staging logs", log2.contains("Downloaded app package"));
+
+		// Verifying temp Route to Green Deployment App Stops working
+		System.out.println("Green App URI : " + cf.getAppURIs().get(1));
+		String uri1 = cf.getAppURIs().get(1);
+		Request request1 = Request.Get(uri1);
+		HttpResponse response1 = request1.execute().returnResponse();
+		int statusCode1 = response1.getStatusLine().getStatusCode();
+		assertEquals("Get request did not respond 404 Not Found", 404, statusCode1);
+
+		// Verifying Orig App Route also works for Green Deployment App Is Correct
+		System.out.println("Orig Green App URI : " + cf.getAppURIs().get(0));
+		String uri2 = cf.getAppURIs().get(0);
+		Request request2 = Request.Get(uri2);
+		HttpResponse response2 = request2.execute().returnResponse();
+		int statusCode2 = response2.getStatusLine().getStatusCode();
+		assertEquals("Get request did not respond 200 OK", 200, statusCode2);
+		String content2 = EntityUtils.toString(response2.getEntity());
+		System.out.println(content);
+
+		assertTrue("Green Deplyment App did not send back correct text", content2.contains("Hello from"));
+	}
+   
 }
