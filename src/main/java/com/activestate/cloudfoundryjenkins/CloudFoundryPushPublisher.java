@@ -203,7 +203,7 @@ public class CloudFoundryPushPublisher extends Recorder {
                                   BuildListener listener, URL targetUrl) throws IOException, InterruptedException {
         try {
             
-            String OrigAppURI = "https://" + deploymentInfo.getHostName() + "." + deploymentInfo.getDomain();
+			String origRoute = deploymentInfo.getHostName() + "." + deploymentInfo.getDomain();
             
 
             listener.getLogger().println("Pushing " + deploymentInfo.getAppName() + " app to " + target);
@@ -296,11 +296,17 @@ public class CloudFoundryPushPublisher extends Recorder {
                     listener.getLogger().println("Application is now running at " + appURI);
                 }
                 listener.getLogger().println("Cloud Foundry push successful.");
-		if (deploymentInfo.isBlueGreenInitiated()) {
-			// Assigning the Original Route To Green Deployment
-			addRouteToApplication(client, deploymentInfo.getAppName(), OrigAppURI);
-			client.updateApplicationUris(deploymentInfo.getOrigAppName(), new ArrayList<String>());//Need to check if more routes exists  
-		}
+				if (deploymentInfo.isBlueGreenInitiated()) {
+					// Assigning the Original Route To Green Deployment
+					addRouteToApplication(client, deploymentInfo.getAppName(), origRoute);
+					client.updateApplicationUris(deploymentInfo.getOrigAppName(), new ArrayList<String>());// Need to
+																											// check if
+																											// more
+																											// routes
+																											// exists
+					String tempRoute = deploymentInfo.getHostName() + "." + deploymentInfo.getDomain();
+					deleteRouteToApplication(client, appName, tempRoute);
+				}
                 return true;
             } else {
                 listener.getLogger().println("ERROR: The application failed to start after " + TIMEOUT + " seconds.");
@@ -339,13 +345,13 @@ public class CloudFoundryPushPublisher extends Recorder {
 
 	}
 
-    	private void handleExistingAppAndUpdateDeploymentInfo(CloudFoundryClient client, BuildListener listener, DeploymentInfo deploymentInfo) {
+	private void handleExistingAppAndUpdateDeploymentInfo(CloudFoundryClient client, BuildListener listener, DeploymentInfo deploymentInfo) {
 		// Check if app already exist
 		List<CloudApplication> existingApps = client.getApplications();
 		boolean createNewApp = true;
 		String appName = deploymentInfo.getAppName();
 		String appHostName = deploymentInfo.getHostName();
-		
+
 		for (CloudApplication app : existingApps) {
 			if (app.getName().equals(appName)) {
 				if (existingAppHandler.value.equals(ExistingAppHandler.Choice.RECREATE.toString())) {
@@ -767,4 +773,20 @@ public class CloudFoundryPushPublisher extends Recorder {
             e.getMessage();
         }
     }
+    
+    /**
+     * Delete a route to an existing application.
+     * @param client
+     * @param appName
+     * @param newRoute
+     */
+	public static void deleteRouteToApplication(CloudFoundryClient client, String appName, String routeToRemove) {
+		try {
+			List<String> routes = client.getApplication(appName).getUris();
+			routes.remove(routeToRemove);
+			client.updateApplicationUris(appName, routes);
+		} catch (CloudFoundryException e) {
+			e.getMessage();
+		}
+	}
 }

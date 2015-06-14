@@ -534,27 +534,25 @@ public class CloudFoundryPushPublisherTest {
 		assertTrue("Green Deployment Build did not succeed", build2.getResult().isBetterOrEqualTo(Result.SUCCESS));
 		assertTrue("Green Deployment Build did not display staging logs", log2.contains("Downloaded app package"));
 
-		// Verifying New Route to Green Deployment App Is Correct
+		// Verifying temp Route to Green Deployment App Stops working
 		System.out.println("Green App URI : " + cf.getAppURIs().get(1));
 		String uri1 = cf.getAppURIs().get(1);
 		Request request1 = Request.Get(uri1);
 		HttpResponse response1 = request1.execute().returnResponse();
 		int statusCode1 = response1.getStatusLine().getStatusCode();
-		assertEquals("Get request did not respond 200 OK", 200, statusCode1);
-		String content1 = EntityUtils.toString(response1.getEntity());
-		System.out.println(content1);
-
-		assertTrue("Green App did not send back correct text", content1.contains("Hello from"));
+		assertEquals("Get request did not respond 404 Not Found", 404, statusCode1);
 
 		// Verifying Orig App Route also works for Green Deployment App Is Correct
 		System.out.println("Orig Green App URI : " + cf.getAppURIs().get(0));
-		Request request2 = Request.Get(uri);
+		String uri2 = cf.getAppURIs().get(0);
+		Request request2 = Request.Get(uri2);
 		HttpResponse response2 = request2.execute().returnResponse();
 		int statusCode2 = response2.getStatusLine().getStatusCode();
 		assertEquals("Get request did not respond 200 OK", 200, statusCode2);
-		String content2 = EntityUtils.toString(response1.getEntity());
-		System.out.println(content2);
-		assertTrue("Orig App Route for Green App did not send back correct text", content2.contains("Hello from"));
+		String content2 = EntityUtils.toString(response2.getEntity());
+		System.out.println(content);
+
+		assertTrue("Green Deplyment App did not send back correct text", content2.contains("Hello from"));
 	}
    
 }
