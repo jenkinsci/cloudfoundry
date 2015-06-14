@@ -20,6 +20,7 @@ import hudson.model.Result;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpResponse;
+import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.fluent.Request;
 import org.apache.http.util.EntityUtils;
 import org.cloudfoundry.client.lib.CloudCredentials;
@@ -38,6 +39,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -89,12 +91,23 @@ public class CloudFoundryPushPublisherTest {
     }
 
     @Test
-    public void testPerformSimplePushManifestFile() throws Exception {
-        FreeStyleProject project = j.createFreeStyleProject();
+    public void testPerformSimplePushManifestFileWithDeafultExistingAppHandler() throws Exception {
+        doSimplePushUsingManifestFile(ExistingAppHandler.getDefault());
+    }
+    
+    @Test
+    public void testPerformSimplePushManifestFileWithRecreateExistingAppHandler() throws Exception {
+    	doSimplePushUsingManifestFile(ExistingAppHandler.getDefault());
+        doSimplePushUsingManifestFile(new ExistingAppHandler("RECREATE", false));
+    }
+
+	private void doSimplePushUsingManifestFile(ExistingAppHandler existingAppHandler) throws IOException,
+			InterruptedException, ExecutionException, ClientProtocolException {
+		FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
 
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, ExistingAppHandler.getDefault(), ManifestChoice.defaultManifestFileConfig());
+                "testCredentialsId", false, existingAppHandler, ManifestChoice.defaultManifestFileConfig());
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -114,7 +127,7 @@ public class CloudFoundryPushPublisherTest {
         String content = EntityUtils.toString(response.getEntity());
         System.out.println(content);
         assertTrue("App did not send back correct text", content.contains("Hello from"));
-    }
+	}
 
     @Test
     public void testPerformSimplePushJenkinsConfig() throws Exception {

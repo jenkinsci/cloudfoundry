@@ -214,9 +214,8 @@ public class CloudFoundryPushPublisher extends Recorder {
             // This is where we would create services, if we decide to add that feature.
             // List<CloudService> cloudServices = deploymentInfo.getServices();
             // client.createService();
-            
-            CloudApplication existingApp = client.getApplication(deploymentInfo.getAppName());
-            System.out.println("Existing app with the same name : "+existingApp);
+            CloudApplication existingApp = getExistingApp(client,deploymentInfo.getAppName());
+            listener.getLogger().println("Existing app with the same name : "+existingApp);
             handleExistingApp(client,listener,existingApp);
             updateDeploymentInfo(existingApp, listener, deploymentInfo);
             
@@ -224,14 +223,13 @@ public class CloudFoundryPushPublisher extends Recorder {
             String appURI = "https://" + appName+ "." + deploymentInfo.getDomain();
             
             listener.getLogger().println("Pushing " + appName+ " with URI "+ appURI+" to " + target);
-            System.out.println("Pushing " + appName+ " with URI "+ appURI+" to " + target);
 
             addToAppURIs(appURI);
             
             if(deploymentInfo.isCreateNewApp())
             {
             	createApplication(client, listener, deploymentInfo, appURI);
-            	 System.out.println("Created new application with route "+appURI);
+            	listener.getLogger().println("Created new application with route "+appURI);
 
             }
             
@@ -274,6 +272,7 @@ public class CloudFoundryPushPublisher extends Recorder {
             
 
             CloudApplication app = client.getApplication(appName);
+
 
             // Keep checking to see if the app is running
             int running = 0;
@@ -333,6 +332,19 @@ public class CloudFoundryPushPublisher extends Recorder {
             return false;
         }
     }
+    
+    private CloudApplication getExistingApp(CloudFoundryClient client,String appName) {
+    	//For some reason the following code block was resulting in Jenkins build error
+    	//client.getApplication(deploymentInfo.getAppName());
+    	CloudApplication existingApp = null;
+    	for (CloudApplication app : client.getApplications()) {
+			if (app.getName().equals(appName)) {
+				existingApp = app;
+				break;
+			}
+		}
+    	return existingApp;
+    }
 
     private void handleExistingApp(CloudFoundryClient client,
 			BuildListener listener, CloudApplication app) {
@@ -352,8 +364,10 @@ public class CloudFoundryPushPublisher extends Recorder {
     		deploymentInfo.setCreateNewApp(true);
     		return;
     	}
-    	
-    	 if( existingAppHandler.value.equals(ExistingAppHandler.Choice.BGDEPLOY.toString())) {
+    	if( existingAppHandler.value.equals(ExistingAppHandler.Choice.RECREATE.toString())) {
+    		deploymentInfo.setCreateNewApp(true);
+    	}
+    	else if( existingAppHandler.value.equals(ExistingAppHandler.Choice.BGDEPLOY.toString())) {
     		String appName = app.getName();
     	    String appHostname = deploymentInfo.getHostname();
             listener.getLogger().println("App already exists, Blue/Green deployment scenario");
