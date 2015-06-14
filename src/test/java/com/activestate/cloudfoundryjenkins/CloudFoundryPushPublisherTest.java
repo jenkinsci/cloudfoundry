@@ -98,7 +98,12 @@ public class CloudFoundryPushPublisherTest {
     @Test
     public void testPerformSimplePushManifestFileWithRecreateExistingAppHandler() throws Exception {
     	doSimplePushUsingManifestFile(ExistingAppHandler.getDefault());
-        doSimplePushUsingManifestFile(new ExistingAppHandler("RECREATE", false));
+        doSimplePushUsingManifestFile(new ExistingAppHandler(ExistingAppHandler.Choice.RECREATE.toString(), false));
+    }
+    
+    @Test
+    public void testPerformSimplePushManifestFileWithBGDeployExistingAppHandler() throws Exception {
+        doSimplePushUsingManifestFile(new ExistingAppHandler(ExistingAppHandler.Choice.BGDEPLOY.toString(), false));
     }
 
 	private void doSimplePushUsingManifestFile(ExistingAppHandler existingAppHandler) throws IOException,
@@ -371,7 +376,7 @@ public class CloudFoundryPushPublisherTest {
                 log.contains("ERROR: The application failed to start after"));
     }
 
-    @Ignore
+    @Ignore 
     public void testPerformEnvVarsManifestFile() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("python-env.zip")));
@@ -400,7 +405,7 @@ public class CloudFoundryPushPublisherTest {
         assertTrue("App did not have correct ENV_VAR_THREE", content.contains("ENV_VAR_THREE: value3"));
     }
 
-    @Ignore
+    @Ignore 
     public void testPerformServicesNamesManifestFile() throws Exception {
         CloudService service1 = new CloudService();
         service1.setName("mysql_service1");
@@ -440,7 +445,7 @@ public class CloudFoundryPushPublisherTest {
         assertTrue("App did not have mysql_service2 bound", content.contains("mysql_service2"));
     }
 
-    @Test
+    @Ignore
     public void testPerformNoRoute() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
@@ -522,11 +527,13 @@ public class CloudFoundryPushPublisherTest {
 		System.out.println(build.getDisplayName()  +" completed");
 		String log = FileUtils.readFileToString(build.getLogFile());
 		System.out.println(log);
+
 		assertTrue("Blue Deployment Build did not succeed", build.getResult().isBetterOrEqualTo(Result.SUCCESS));
 		assertTrue("Blue Deployment Build did not display staging logs", log.contains("Downloaded app package"));
 
 		// Verifying Orig Route to Orig App Is Correct
 		System.out.println("Blue App URI : "+  cf.getAppURIs().get(0));
+
 		String uri = cf.getAppURIs().get(0);
 		Request request = Request.Get(uri);
 		HttpResponse response = request.execute().returnResponse();
@@ -536,14 +543,20 @@ public class CloudFoundryPushPublisherTest {
 		System.out.println(content);
 		assertTrue("Blue App did not send back correct text", content.contains("Hello from"));
 		
+		// Start Another Thread that continously queries app
+		// This thread keeps a counter of # requests sent, success and failures
+		// No initiate another build, this time it will be a BG deployment
+		
 		build = project.scheduleBuild2(0).get();
 		System.out.println(build.getDisplayName() + " completed");
 		log = FileUtils.readFileToString(build.getLogFile());
 		System.out.println(log);
 		assertTrue("Green Deployment Build did not succeed", build.getResult().isBetterOrEqualTo(Result.SUCCESS));
 		assertTrue("Green Deployment Build did not display staging logs", log.contains("Downloaded app package"));
-		
+		// Wait for 15 sec
+		//Now stop the other thread and validate that there are no errors.
 		// Verifying New Route to Green Deployment App Is Correct
+		
 		System.out.println("Green App URI : " + cf.getAppURIs().get(1));
 		uri = cf.getAppURIs().get(1);
 		request = Request.Get(uri);
@@ -555,4 +568,5 @@ public class CloudFoundryPushPublisherTest {
 		assertTrue("Green App did not send back correct text", content1.contains("Hello from"));
 
 	}
+
 }

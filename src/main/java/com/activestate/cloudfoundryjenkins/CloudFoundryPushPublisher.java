@@ -208,7 +208,6 @@ public class CloudFoundryPushPublisher extends Recorder {
                                   BuildListener listener, URL targetUrl) throws IOException, InterruptedException {
         try {
             
-
             listener.getLogger().println("Processing " + deploymentInfo.getAppName());
 
             // This is where we would create services, if we decide to add that feature.
@@ -775,4 +774,35 @@ public class CloudFoundryPushPublisher extends Recorder {
             return FormValidation.validateRequired(value);
         }
     }
+    /**
+     * Adds a route to an existing application.
+     * @param client
+     * @param appName
+     * @param newRoute
+     */
+    public static void addRouteToApplication(CloudFoundryClient client, String appName, String newRoute) {
+        try {
+            List<String> routes = client.getApplication(appName).getUris();
+            routes.add(newRoute);
+            client.updateApplicationUris(appName, routes);
+        } catch (CloudFoundryException e) {
+            e.getMessage();
+        }
+    }
+    
+    /**
+     * Delete a route to an existing application.
+     * @param client
+     * @param appName
+     * @param newRoute
+     */
+	public static void deleteRouteToApplication(CloudFoundryClient client, String appName, String routeToRemove) {
+		try {
+			List<String> routes = client.getApplication(appName).getUris();
+			routes.remove(routeToRemove);
+			client.updateApplicationUris(appName, routes);
+		} catch (CloudFoundryException e) {
+			e.getMessage();
+		}
+	}
 }

@@ -39,6 +39,9 @@ public class DeploymentInfo {
     private String buildpack;
     private String command;
     private String domain;
+    private  boolean  isNewAppToBeCreated  = false;
+    private String origAppName;
+    private boolean isBlueGreenInitiated = false;
 
     private Map<String, String> envVars = new HashMap<String, String>();
     private List<String> servicesNames = new ArrayList<String>();
@@ -328,6 +331,10 @@ public class DeploymentInfo {
         return servicesNames;
     }
 
+    /**
+	 * @param appName
+	 *            the appName to set
+	 */
 	public void setAppName(String appName) {
 		this.appName = appName;
 	}
@@ -354,4 +361,19 @@ public class DeploymentInfo {
 		return createNewApp;
 	}
 
+
+	/**
+	 * @return the origAppName
+	 */
+	public String getOrigAppName() {
+		return origAppName;
+	}
+
+	/**
+	 * @param origAppName the origAppName to set
+	 */
+	public void setOrigAppName(String origAppName) {
+		this.origAppName = origAppName;
+	}
+	
 }
