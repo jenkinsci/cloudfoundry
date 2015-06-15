@@ -8,10 +8,13 @@ import com.activestate.cloudfoundryjenkins.CloudFoundryPushPublisher.DescriptorI
 import com.activestate.cloudfoundryjenkins.CloudFoundryPushPublisher.EnvironmentVariable;
 import com.activestate.cloudfoundryjenkins.CloudFoundryPushPublisher.ManifestChoice;
 import com.activestate.cloudfoundryjenkins.CloudFoundryPushPublisher.ServiceName;
+
 import hudson.model.AbstractBuild;
 import hudson.model.TaskListener;
+
 import org.jenkinsci.plugins.tokenmacro.MacroEvaluationException;
 import org.jenkinsci.plugins.tokenmacro.TokenMacro;
+import org.jvnet.hudson.test.JenkinsRule;
 
 import java.io.IOException;
 import java.io.PrintStream;
@@ -47,6 +50,9 @@ public class DeploymentInfo {
     private List<String> servicesNames = new ArrayList<String>();
 	private boolean isBGDeployment;
 	private boolean createNewApp;
+	private String blueHostName;
+	private List<String> blueAppRoutes = new ArrayList<String>();
+	private String blueAppName;
 
     /**
      * Constructor for reading the manifest.yml file.
@@ -374,6 +380,33 @@ public class DeploymentInfo {
 	 */
 	public void setOrigAppName(String origAppName) {
 		this.origAppName = origAppName;
+	}
+
+	public void setBlueHostname(String blueHost) {
+		this.blueHostName = blueHost;
+	}
+
+	public String getBlueHostname() {
+		return blueHostName;
+	}
+
+	public void setBlueRoutes(List<String> blueRoutes) {
+		this.blueAppRoutes .clear();
+		this.blueAppRoutes.addAll(blueRoutes);
+		
+	}
+
+	public List<String> getBlueRoutes() {
+		return blueAppRoutes;
+	}
+
+	public void setBlueAppName(String blueAppName) {
+		this.blueAppName = blueAppName;
+		
+	}
+
+	public String getBlueAppName() {
+		return blueAppName;
 	}
 	
 }

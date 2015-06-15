@@ -7,6 +7,7 @@ package com.activestate.cloudfoundryjenkins;
 import com.activestate.cloudfoundryjenkins.CloudFoundryPushPublisher.EnvironmentVariable;
 import com.activestate.cloudfoundryjenkins.CloudFoundryPushPublisher.ManifestChoice;
 import com.activestate.cloudfoundryjenkins.CloudFoundryPushPublisher.ServiceName;
+import com.kenai.jffi.Array;
 
 import hudson.FilePath;
 import hudson.model.FreeStyleBuild;
@@ -75,8 +76,17 @@ public class DeploymentInfoTest {
         deploymentInfo.setCreateNewApp(true);
         deploymentInfo.setAppName(newAppName);
         deploymentInfo.setHostname(newHostName);
+        List<String> blueRoutes = new ArrayList<String>();
+        blueRoutes.add("blue route");
+        
+        deploymentInfo.setBlueRoutes(blueRoutes);
+        deploymentInfo.setBlueHostname("hello-java");
+        deploymentInfo.setBlueAppName("hello-java");
         assertEquals(newAppName, deploymentInfo.getAppName());
         assertEquals(newHostName, deploymentInfo.getHostname());
+        assertEquals("hello-java", deploymentInfo.getBlueHostname());
+        assertEquals("hello-java", deploymentInfo.getBlueAppName());
+        assertEquals("blue route", deploymentInfo.getBlueRoutes().get(0));
         assert(deploymentInfo.isBGDeployment());
         assert(deploymentInfo.isCreateNewApp());
     }
