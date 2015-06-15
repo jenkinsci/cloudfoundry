@@ -8,10 +8,13 @@ import com.activestate.cloudfoundryjenkins.CloudFoundryPushPublisher.DescriptorI
 import com.activestate.cloudfoundryjenkins.CloudFoundryPushPublisher.EnvironmentVariable;
 import com.activestate.cloudfoundryjenkins.CloudFoundryPushPublisher.ManifestChoice;
 import com.activestate.cloudfoundryjenkins.CloudFoundryPushPublisher.ServiceName;
+
 import hudson.model.AbstractBuild;
 import hudson.model.TaskListener;
+
 import org.jenkinsci.plugins.tokenmacro.MacroEvaluationException;
 import org.jenkinsci.plugins.tokenmacro.TokenMacro;
+import org.jvnet.hudson.test.JenkinsRule;
 
 import java.io.IOException;
 import java.io.PrintStream;
@@ -45,6 +48,11 @@ public class DeploymentInfo {
 
     private Map<String, String> envVars = new HashMap<String, String>();
     private List<String> servicesNames = new ArrayList<String>();
+	private boolean isBGDeployment;
+	private boolean createNewApp;
+	private String blueHostName;
+	private List<String> blueAppRoutes = new ArrayList<String>();
+	private String blueAppName;
 
     /**
      * Constructor for reading the manifest.yml file.
@@ -289,7 +297,7 @@ public class DeploymentInfo {
         return memory;
     }
 
-    public String getHostName() {
+    public String getHostname() {
         return hostname;
     }
 
@@ -337,26 +345,29 @@ public class DeploymentInfo {
 		this.appName = appName;
 	}
 
-	/**
-	 * @param hostname
-	 *            the hostname to set
-	 */
-	public void setHostName(String hostname) {
+	public void setHostname(String hostname) {
 		this.hostname = hostname;
 	}
-	/**
-	 * @return the isNewAppToBeCreated
-	 */
-	public boolean isNewAppToBeCreated() {
-		return isNewAppToBeCreated;
+
+	public void setBGDeployment(boolean bgdeploy) {
+		this.isBGDeployment = bgdeploy ;
+		
 	}
 
-	/**
-	 * @param isNewAppToBeCreated the isNewAppToBeCreated to set
-	 */
-	public void setNewAppToBeCreated(boolean isNewAppToBeCreated) {
-		this.isNewAppToBeCreated = isNewAppToBeCreated;
+	public boolean isBGDeployment() {
+		return isBGDeployment;
 	}
+
+	public void setCreateNewApp(boolean createApp) {
+		this.createNewApp = createApp;
+		
+	}
+	
+	public boolean isCreateNewApp() {
+		return createNewApp;
+	}
+
+
 	/**
 	 * @return the origAppName
 	 */
@@ -370,17 +381,32 @@ public class DeploymentInfo {
 	public void setOrigAppName(String origAppName) {
 		this.origAppName = origAppName;
 	}
-	/**
-	 * @return the isBlueGreenInitiated
-	 */
-	public boolean isBlueGreenInitiated() {
-		return isBlueGreenInitiated;
+
+	public void setBlueHostname(String blueHost) {
+		this.blueHostName = blueHost;
 	}
 
-	/**
-	 * @param isBlueGreenInitiated the isBlueGreenInitiated to set
-	 */
-	public void setBlueGreenInitiated(boolean isBlueGreenInitiated) {
-		this.isBlueGreenInitiated = isBlueGreenInitiated;
+	public String getBlueHostname() {
+		return blueHostName;
 	}
+
+	public void setBlueRoutes(List<String> blueRoutes) {
+		this.blueAppRoutes .clear();
+		this.blueAppRoutes.addAll(blueRoutes);
+		
+	}
+
+	public List<String> getBlueRoutes() {
+		return blueAppRoutes;
+	}
+
+	public void setBlueAppName(String blueAppName) {
+		this.blueAppName = blueAppName;
+		
+	}
+
+	public String getBlueAppName() {
+		return blueAppName;
+	}
+	
 }

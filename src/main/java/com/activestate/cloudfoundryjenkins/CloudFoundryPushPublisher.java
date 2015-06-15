@@ -31,7 +31,6 @@ import net.lingala.zip4j.exception.ZipException;
 import org.cloudfoundry.client.lib.*;
 import org.cloudfoundry.client.lib.domain.*;
 import org.cloudfoundry.client.lib.org.springframework.web.client.ResourceAccessException;
-import org.cloudfoundry.client.lib.rest.CloudControllerClient;
 import org.jenkinsci.plugins.tokenmacro.MacroEvaluationException;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
@@ -153,6 +152,12 @@ public class CloudFoundryPushPublisher extends Recorder {
             boolean success = true;
             for (DeploymentInfo deploymentInfo : allDeploymentInfo) {
                 boolean lastSuccess = processOneApp(client, deploymentInfo, build, listener, targetUrl);
+                if(lastSuccess && deploymentInfo.isBGDeployment()) {
+                		//do post processing here.
+                		doRouteRemappingForBlueGreenDeployment(client,
+								deploymentInfo);
+                		doAppRenamingForBlueGreenDeployment(client,deploymentInfo);
+                }
                 // If an app fails, the build status is failure, but we should still try pushing them
                 success = success && lastSuccess;
             }
@@ -195,35 +200,79 @@ public class CloudFoundryPushPublisher extends Recorder {
             return false;
         } catch (Exception e) {
             e.printStackTrace(listener.getLogger());
+            e.printStackTrace();
+            return false;
+        }
+        catch (Throwable th) {
+            th.printStackTrace(listener.getLogger());
+            th.printStackTrace();
             return false;
         }
     }
 
+	private void doRouteRemappingForBlueGreenDeployment(
+			CloudFoundryClient client, DeploymentInfo deploymentInfo) {
+		String greenRoute = deploymentInfo.getHostname()+"."+deploymentInfo.getDomain();
+		List<String> greenRoutes = new ArrayList<String>(1);
+		greenRoutes.add(greenRoute);
+		
+		List<String> blueRoutes = deploymentInfo.getBlueRoutes();
+		addRoutesToApplication(client,deploymentInfo.getAppName(),blueRoutes);
+		deleteRoutesFromApplication(client,deploymentInfo.getBlueAppName(),blueRoutes);
+		deleteRoutesFromApplication(client,deploymentInfo.getAppName(),greenRoutes);
+		
+		
+		// TODO: Handle retain app flag here.
+		// IF false, delete blueApp
+		// IF true, cehck for blueApp_old, if exists delete
+		// Rename blueApp to blueApp_Old
+	}
+	
+	private void doAppRenamingForBlueGreenDeployment(
+			CloudFoundryClient client, DeploymentInfo deploymentInfo) {
+		
+		// TODO: Handle retain app flag here.
+		// IF false, delete blueApp
+		// IF true, cehck for blueApp_old, if exists delete
+		// Rename blueApp to blueApp_Old
+		
+		//Now rename greenApp to blueApp
+	}
+    
     private boolean processOneApp(CloudFoundryClient client, DeploymentInfo deploymentInfo, AbstractBuild build,
                                   BuildListener listener, URL targetUrl) throws IOException, InterruptedException {
         try {
             
-			String origRoute = deploymentInfo.getHostName() + "." + deploymentInfo.getDomain();
+            listener.getLogger().println("Processing " + deploymentInfo.getAppName());
+
+            // This is where we would create services, if we decide to add that feature.
+            // List<CloudService> cloudServices = deploymentInfo.getServices();
+            // client.createService();
+            CloudApplication existingApp = getExistingApp(client,deploymentInfo.getAppName());
+            listener.getLogger().println("Existing app with the same name : "+existingApp);
+            handleExistingApp(client,listener,existingApp);
+            updateDeploymentInfo(existingApp, listener, deploymentInfo);
             
+            String appName = deploymentInfo.getAppName();
+            String appURI = "https://" + appName+ "." + deploymentInfo.getDomain();
+            
+            listener.getLogger().println("Pushing " + appName+ " with URI "+ appURI+" to " + target);
 
-            listener.getLogger().println("Pushing " + deploymentInfo.getAppName() + " app to " + target);
+            addToAppURIs(appURI);
+            
+            if(deploymentInfo.isCreateNewApp())
+            {
+	            	createApplication(client, listener, deploymentInfo, appURI);
+	            	listener.getLogger().println("Created new application with route "+appURI);
 
-			// This is where we would create services, if we decide to add that feature.
-			// List<CloudService> cloudServices = deploymentInfo.getServices();
-			// client.createService();
-			 handleExistingAppAndUpdateDeploymentInfo(client, listener, deploymentInfo);
-			String appURI = "https://" + deploymentInfo.getHostName() + "." + deploymentInfo.getDomain();
-			
-			addToAppURIs(appURI);
-			if (deploymentInfo.isNewAppToBeCreated()) {
-				// Create app if it doesn't already exist, or if 'delete existing app and create new' flag parameter is true
-				createApplication(client, listener, deploymentInfo, appURI);
-			}
-			String appName = deploymentInfo.getAppName();
-			// Unbind all routes if no-route parameter is set
-			if (deploymentInfo.isNoRoute()) {
-				client.updateApplicationUris(appName, new ArrayList<String>());
-			}
+            }
+            
+            boolean registered = registerForLogStream( client, appName, listener);
+
+            // Unbind all routes if no-route parameter is set
+            if (deploymentInfo.isNoRoute()) {
+                client.updateApplicationUris(appName, new ArrayList<String>());
+            }
 
             // Add environment variables
             if (!deploymentInfo.getEnvVars().isEmpty()) {
@@ -238,13 +287,11 @@ public class CloudFoundryPushPublisher extends Recorder {
             // Push files
             listener.getLogger().println("Pushing app bits.");
             
-            boolean registered = registerForLogStream( client, appName, listener);
-            
             pushAppBits(build, deploymentInfo, client);
 
             // Start or restart application
             StartingInfo startingInfo;
-            if (deploymentInfo.isNewAppToBeCreated()) {
+            if (deploymentInfo.isCreateNewApp()) {
                 listener.getLogger().println("Starting application.");
                 startingInfo = client.startApplication(appName);
             } else {
@@ -254,11 +301,12 @@ public class CloudFoundryPushPublisher extends Recorder {
 
             // Start printing the staging logs
             if(!registered) {
-            	printStagingLogs(client, listener, startingInfo, appName);
+            		printStagingLogs(client, listener, startingInfo, appName);
             }
             
 
             CloudApplication app = client.getApplication(appName);
+
 
             // Keep checking to see if the app is running
             int running = 0;
@@ -296,17 +344,6 @@ public class CloudFoundryPushPublisher extends Recorder {
                     listener.getLogger().println("Application is now running at " + appURI);
                 }
                 listener.getLogger().println("Cloud Foundry push successful.");
-				if (deploymentInfo.isBlueGreenInitiated()) {
-					// Assigning the Original Route To Green Deployment
-					addRouteToApplication(client, deploymentInfo.getAppName(), origRoute);
-					client.updateApplicationUris(deploymentInfo.getOrigAppName(), new ArrayList<String>());// Need to
-																											// check if
-																											// more
-																											// routes
-																											// exists
-					String tempRoute = deploymentInfo.getHostName() + "." + deploymentInfo.getDomain();
-					deleteRouteToApplication(client, appName, tempRoute);
-				}
                 return true;
             } else {
                 listener.getLogger().println("ERROR: The application failed to start after " + TIMEOUT + " seconds.");
@@ -329,51 +366,70 @@ public class CloudFoundryPushPublisher extends Recorder {
             return false;
         }
     }
+    
+    private CloudApplication getExistingApp(CloudFoundryClient client,String appName) {
+	    	//For some reason the following code block was resulting in Jenkins build error
+	    	//client.getApplication(deploymentInfo.getAppName());
+	    	CloudApplication existingApp = null;
+	    	for (CloudApplication app : client.getApplications()) {
+				if (app.getName().equals(appName)) {
+					existingApp = app;
+					break;
+				}
+			}
+	    	return existingApp;
+    }
 
-    private void createApplication(CloudFoundryClient client, BuildListener listener,
- DeploymentInfo deploymentInfo, String appURI) {
-		// Create app if it doesn't exist
+    private void handleExistingApp(CloudFoundryClient client,
+			BuildListener listener, CloudApplication app) {
+	    	if(null == app) {
+	    		return;
+	    	}
+	    		
+	    	if (existingAppHandler.value.equals(ExistingAppHandler.Choice.RECREATE.toString())) {
+            listener.getLogger().println("App already exists, resetting.");
+            client.deleteApplication(app.getName());
+            listener.getLogger().println("App deleted.");
+        } 
+	}
+    
+    private void updateDeploymentInfo(CloudApplication existingApp, BuildListener listener, DeploymentInfo deploymentInfo) {
+	    	if(null == existingApp) {
+	    		deploymentInfo.setCreateNewApp(true);
+	    		return;
+	    	}
+	    	if( existingAppHandler.value.equals(ExistingAppHandler.Choice.RECREATE.toString())) {
+	    		deploymentInfo.setCreateNewApp(true);
+	    	}
+	    	else if( existingAppHandler.value.equals(ExistingAppHandler.Choice.BGDEPLOY.toString())) {
+	    		String appName = existingApp.getName();
+	    	    String appHostname = deploymentInfo.getHostname();
+            listener.getLogger().println("App already exists, Blue/Green deployment scenario");
+            String suffix = UUID.randomUUID().toString();
+			String greenAppName = appName + "-" + suffix;
+			String greenAppHostname = appHostname + "-" + suffix;
+			deploymentInfo.setBlueAppName(appName);
+			deploymentInfo.setAppName(greenAppName);
+			deploymentInfo.setHostname(greenAppHostname);
+			deploymentInfo.setCreateNewApp(true);
+			deploymentInfo.setBlueRoutes(existingApp.getUris());
+			deploymentInfo.setBGDeployment(true);
+        }
+		
+    }
+
+	private void createApplication(CloudFoundryClient client,
+			BuildListener listener, DeploymentInfo deploymentInfo, String appURI) {
 		listener.getLogger().println("Creating new app.");
-		Staging staging = new Staging(deploymentInfo.getCommand(), deploymentInfo.getBuildpack(), null, deploymentInfo.getTimeout());
+		Staging staging = new Staging(deploymentInfo.getCommand(), deploymentInfo.getBuildpack(),
+		        null, deploymentInfo.getTimeout());
 		List<String> uris = new ArrayList<String>();
 		// Pass an empty List as the uri list if no-route is set
 		if (!deploymentInfo.isNoRoute()) {
-			uris.add(appURI);
+		    uris.add(appURI);
 		}
 		List<String> services = deploymentInfo.getServicesNames();
 		client.createApplication(deploymentInfo.getAppName(), staging, deploymentInfo.getMemory(), uris, services);
-
-	}
-
-	private void handleExistingAppAndUpdateDeploymentInfo(CloudFoundryClient client, BuildListener listener, DeploymentInfo deploymentInfo) {
-		// Check if app already exist
-		List<CloudApplication> existingApps = client.getApplications();
-		boolean createNewApp = true;
-		String appName = deploymentInfo.getAppName();
-		String appHostName = deploymentInfo.getHostName();
-
-		for (CloudApplication app : existingApps) {
-			if (app.getName().equals(appName)) {
-				if (existingAppHandler.value.equals(ExistingAppHandler.Choice.RECREATE.toString())) {
-					listener.getLogger().println("App already exists, resetting.");
-					client.deleteApplication(deploymentInfo.getAppName());
-					listener.getLogger().println("App deleted.");
-				} else if (existingAppHandler.value.equals(ExistingAppHandler.Choice.RESTART.toString())) {
-					createNewApp = false;
-					listener.getLogger().println("App already exists, skipping creation.");
-				} else if (existingAppHandler.value.equals(ExistingAppHandler.Choice.BGDEPLOY.toString())) {
-					String suffix = UUID.randomUUID().toString();
-					String greenAppName = appName + "-" + suffix;
-					String greenAppHostname = appHostName + "-" + suffix;
-					deploymentInfo.setAppName(greenAppName);
-					deploymentInfo.setHostName(greenAppHostname);
-					deploymentInfo.setBlueGreenInitiated(true);
-				}
-				break;
-			}
-		}
-		deploymentInfo.setOrigAppName(appName);
-		deploymentInfo.setNewAppToBeCreated(createNewApp);
 	}
 
     private void pushAppBits(AbstractBuild build, DeploymentInfo deploymentInfo, CloudFoundryClient client)
@@ -761,14 +817,10 @@ public class CloudFoundryPushPublisher extends Recorder {
      * @param appName
      * @param newRoute
      */
-    public static void addRouteToApplication(CloudFoundryClient client, String appName, String newRoute) {
-        try {
-            List<String> routes = client.getApplication(appName).getUris();
-            routes.add(newRoute);
-            client.updateApplicationUris(appName, routes);
-        } catch (CloudFoundryException e) {
-            e.getMessage();
-        }
+    private static void addRoutesToApplication(CloudFoundryClient client, String appName, List<String> newRoutes) throws CloudFoundryException  {
+        List<String> routes = client.getApplication(appName).getUris();
+        routes.addAll(newRoutes);
+        client.updateApplicationUris(appName, routes);
     }
     
     /**
@@ -777,13 +829,9 @@ public class CloudFoundryPushPublisher extends Recorder {
      * @param appName
      * @param newRoute
      */
-	public static void deleteRouteToApplication(CloudFoundryClient client, String appName, String routeToRemove) {
-		try {
-			List<String> routes = client.getApplication(appName).getUris();
-			routes.remove(routeToRemove);
-			client.updateApplicationUris(appName, routes);
-		} catch (CloudFoundryException e) {
-			e.getMessage();
-		}
+	private  static void deleteRoutesFromApplication(CloudFoundryClient client, String appName, List<String> routesToRemove) throws CloudFoundryException {
+		List<String> routes = client.getApplication(appName).getUris();
+		routes.removeAll(routesToRemove);
+		client.updateApplicationUris(appName, routes);
 	}
 }
