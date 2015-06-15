@@ -1,0 +1,58 @@
+<div>
+  <b> Handle Existing Application </b>
+  <BR/>
+  There are three options for handling the case of an application being pushed to CloudFoundry finds that another application with the same name exists.
+  <BR/>
+  <BR/>
+  <li> Blue/Green deployment </li>
+  <li> Delete and Recreate </li>
+  <li> Push App and Restart </li>
+  <p>
+  
+  <b> Note that the plugin uses application name as the key. </b>
+  
+  </p>
+  <div>
+  <b> Blue/Green Deployment </b>
+  <p>
+  In Blue/Green mode of deployment, a new version of app can be deployed with no downtime of existing app. 
+  The new version of app will be deployed using a temporary name and route.
+  <BR/>
+  Once the app is started successfully, the original route is mapped to the new version of the app.
+  Finally, the original app is either deleted or renamed and the temporary name assigned to the new version of the app is changed to its original name.
+  </p>
+  <BR/>
+  Do not delete Blue (orig) app :
+  <BR/>
+  Choose this option, if the original app has to be retained.  
+  Even though the app is retained, there wont be any routes mapped to the app, so no incoming network traffic can hit the app.
+  <BR/>
+  <BR/>
+  Do not choose this option if the app has any data input channel other than http, such as processing data from a message queue.
+ <BR/>
+ <BR/>
+  The retained app will be renamed to [orig_app_name]_old.<BR/>
+  If an app with name [orig_app_name]_old already exists, it will be deleted prior to renaming the blue/orig app to [orig_app_name]_old.
+ <BR/>
+  </div>
+  <div>
+  <BR/>
+  <BR/>
+  <b> Delete and Recreate </b>
+  <p>
+  This option, when chosen, will result in any existing app to be deleted and new app will be created and pushed.<BR/>
+  Note that this option will result in application downtime if a new version of an already existing app is being pushed.
+  </p>
+  </div>
+  <div>
+  <BR/>
+  <BR/>
+  <b> Push App and Restart </b>
+  <p>
+  This option, when chosen, will result in pushing of new application bits and restart of any existing application.<BR/>
+  Since the application is not re-staged, no changes to services configured for the application will be reflected.
+  <BR/><BR/>
+   Note that this option will result in application downtime if a new version of an already existing app is being pushed.
+  </p>
+  </div>
+</div>
