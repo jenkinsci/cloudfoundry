@@ -14,8 +14,6 @@ import hudson.model.TaskListener;
 
 import org.jenkinsci.plugins.tokenmacro.MacroEvaluationException;
 import org.jenkinsci.plugins.tokenmacro.TokenMacro;
-import org.jvnet.hudson.test.JenkinsRule;
-
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Path;
