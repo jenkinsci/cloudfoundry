@@ -58,7 +58,6 @@ public class CloudFoundryPushPublisherTest {
     @Rule
     public JenkinsRule j = new JenkinsRule();
 
-
     @BeforeClass
     public static void initialiseClient() throws IOException {
         // Skip all tests of this class if no test CF platform is specified
@@ -590,111 +589,133 @@ public class CloudFoundryPushPublisherTest {
     }
     
     @Test
-	public void testPerformBGDeploy() throws Exception {
+   	public void testPerformBGDeployRetainingOrigApp() throws Exception {
 
-		FreeStyleProject project = j.createFreeStyleProject();
-		project.setScm(new ExtractResourceSCM(getClass().getResource(
-				"hello-java.zip")));
-		EnvironmentVariable sshConnENVv1 = new EnvironmentVariable(
-				"SSH_CONNECTION", "Hub Port 1.1.1.1 None");
-		List<EnvironmentVariable> envVars = new ArrayList<EnvironmentVariable>();
-		envVars.add(sshConnENVv1);
+   		doBGDeployment(true);
+   	}
+    
+    @Test
+   	public void testPerformBGDeployRemovingOrigApp() throws Exception {
 
-		ManifestChoice manifest = new ManifestChoice("jenkinsConfig", null,
-				"hello-java", 512, "", 0, 0, false,
-				"target/hello-java-1.0.war", "", "", "", envVars,
-				new ArrayList<ServiceName>());
-		CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(
-				TEST_TARGET, TEST_ORG, TEST_SPACE, "testCredentialsId", false,
-				new ExistingAppHandler(ExistingAppHandler.Choice.BGDEPLOY.toString(), false), manifest);
+   		doBGDeployment(false);
+    }
 
-		project.getPublishersList().add(cf);
+   	private void doBGDeployment(boolean retainOrigApp) throws IOException, InterruptedException, ExecutionException, ClientProtocolException {
+   		FreeStyleProject project = j.createFreeStyleProject();
+   		project.setScm(new ExtractResourceSCM(getClass().getResource(
+   				"hello-java.zip")));
+   		EnvironmentVariable sshConnENVv1 = new EnvironmentVariable(
+   				"SSH_CONNECTION", "Hub Port 1.1.1.1 None");
+   		List<EnvironmentVariable> envVars = new ArrayList<EnvironmentVariable>();
+   		envVars.add(sshConnENVv1);
 
-		FreeStyleBuild build = project.scheduleBuild2(0).get();
-		System.out.println(build.getDisplayName() + " completed");
-		String log = FileUtils.readFileToString(build.getLogFile());
-		System.out.println(log);
+   		ManifestChoice manifest = new ManifestChoice("jenkinsConfig", null,
+   				"hello-java", 512, "", 0, 0, false,
+   				"target/hello-java-1.0.war", "", "", "", envVars,
+   				new ArrayList<ServiceName>());
+   		CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(
+   				TEST_TARGET, TEST_ORG, TEST_SPACE, "testCredentialsId", false,
+   				new ExistingAppHandler(ExistingAppHandler.Choice.BGDEPLOY.toString(), retainOrigApp), manifest);
 
-		assertTrue("Blue Deployment Build did not succeed", build.getResult()
-				.isBetterOrEqualTo(Result.SUCCESS));
-		assertTrue("Blue Deployment Build did not display staging logs",
-				log.contains("Downloaded app package"));
+   		project.getPublishersList().add(cf);
 
-		// Verifying Orig Route to Orig App Is Correct
-		System.out.println("Blue App URI : " + cf.getAppURIs().get(0));
+   		FreeStyleBuild build = project.scheduleBuild2(0).get();
+   		System.out.println(build.getDisplayName() + " completed");
+   		String log = FileUtils.readFileToString(build.getLogFile());
+   		System.out.println(log);
 
-		String uri = cf.getAppURIs().get(0);
-		Request request = Request.Get(uri);
-		HttpResponse response = request.execute().returnResponse();
-		int statusCode = response.getStatusLine().getStatusCode();
-		assertEquals("Blue App  Get request did not respond 200 OK", 200,
-				statusCode);
-		String content = EntityUtils.toString(response.getEntity());
-		System.out.println(content);
-		assertTrue("Blue App did not send back correct text",
-				content.contains("1.1.1.1"));
+   		assertTrue("Blue Deployment Build did not succeed", build.getResult()
+   				.isBetterOrEqualTo(Result.SUCCESS));
+   		assertTrue("Blue Deployment Build did not display staging logs",
+   				log.contains("Downloaded app package"));
 
-		// Start Another Thread that continously queries app
-		// This thread keeps a counter of # requests sent, success and failures
-		// Now initiate another build, this time it will be a BG deployment
-		BGRequester requester = new BGRequester(uri);
-		Thread requesterThread = new Thread(requester);
-		requesterThread.start();
+   		// Verifying Orig Route to Orig App Is Correct
+   		System.out.println("Blue App URI : " + cf.getAppURIs().get(0));
 
-		//Sleep for 5 seconds before doing another push
-		Thread.sleep(5000);
+   		String uri = cf.getAppURIs().get(0);
+   		Request request = Request.Get(uri);
+   		HttpResponse response = request.execute().returnResponse();
+   		int statusCode = response.getStatusLine().getStatusCode();
+   		assertEquals("Blue App  Get request did not respond 200 OK", 200,
+   				statusCode);
+   		String content = EntityUtils.toString(response.getEntity());
+   		System.out.println(content);
+   		assertTrue("Blue App did not send back correct text",
+   				content.contains("1.1.1.1"));
+
+   		// Start Another Thread that continously queries app
+   		// This thread keeps a counter of # requests sent, success and failures
+   		// Now initiate another build, this time it will be a BG deployment
+   		BGRequester requester = new BGRequester(uri);
+   		Thread requesterThread = new Thread(requester);
+   		requesterThread.start();
+
+   		//Sleep for 5 seconds before doing another push
+   		Thread.sleep(5000);
+   		
+   		// Update Env Var
+   		envVars.clear();
+   		EnvironmentVariable sshConnENVv2 = new EnvironmentVariable(
+   				"SSH_CONNECTION", "Hub Port 2.2.2.2 None");
+   		envVars.add(sshConnENVv2);
+
+   		build = project.scheduleBuild2(0).get();
+   		System.out.println(build.getDisplayName() + " completed");
+   		log = FileUtils.readFileToString(build.getLogFile());
+   		System.out.println(log);
+   		assertTrue("Green Deployment Build did not succeed", build.getResult()
+   				.isBetterOrEqualTo(Result.SUCCESS));
+   		assertTrue("Green Deployment Build did not display staging logs",
+   				log.contains("Downloaded app package"));
+   		
+   		// Wait for 5 sec
+   		// Now stop the other thread and validate that there are no errors.
+   		Thread.sleep(5000);
+   		requester.stop();
+   		requesterThread.join();
+
+   		assertTrue (requester.getReqCount() > 0);
+   		assertTrue (requester.getSuccessResCount() > 0);
+   		assertTrue (requester.getErrorResCount() == 0);
+
+   		// Verifying New Route of Green Deployment does not exist
+   		System.out.println("Green App URI : " + cf.getAppURIs().get(1));
+   		String greenUri = cf.getAppURIs().get(1);
+   		request = Request.Get(greenUri);
+   		response = request.execute().returnResponse();
+   		statusCode = response.getStatusLine().getStatusCode();
+   		assertEquals("Green App Get request did not respond 404 Not Found",
+   				404, statusCode);
+   		
+   		requester = new BGRequester(uri);
+   		requester.setContentToValidate("2.2.2.2");
+   		requester.doContentValidation(true);
+   		Thread requesterThread1 = new Thread(requester);
+   		requesterThread1.start();
+   		Thread.sleep(10000);
+   		requester.stop();
+   		requesterThread1.join();
+
+   		assertTrue (requester.getReqCount() > 0);
+   		assertTrue (requester.getSuccessResCount() > 0);
+   		assertEquals ("There are error responses for the new version of the app.",0,requester.getErrorResCount());
+   		
+   		// If (retainOrigApp), verify that blueAppname_old is present
+   		// else verify that no blueAppName_old is present.
+		if (retainOrigApp) {
+			System.out.println("Config is to retain Blue App.  Checking for "+manifest.appName+"_old");
+			assertTrue(cf.doesAppExist(client,manifest.appName+"_old"));
+		}
+		else
+		{
+			System.out.println("Config is NOT to retain Blue App.  Verifying that "+manifest.appName+"_old does not exist.");
+			assertTrue(!cf.doesAppExist(client,manifest.appName+"_old"));
+		}
+		System.out.println(" Verifying that "+manifest.appName+" does  exist.");
+		assertTrue(cf.doesAppExist(client,manifest.appName));
 		
-		// Update Env Var
-		envVars.clear();
-		EnvironmentVariable sshConnENVv2 = new EnvironmentVariable(
-				"SSH_CONNECTION", "Hub Port 2.2.2.2 None");
-		envVars.add(sshConnENVv2);
-
-		build = project.scheduleBuild2(0).get();
-		System.out.println(build.getDisplayName() + " completed");
-		log = FileUtils.readFileToString(build.getLogFile());
-		System.out.println(log);
-		assertTrue("Green Deployment Build did not succeed", build.getResult()
-				.isBetterOrEqualTo(Result.SUCCESS));
-		assertTrue("Green Deployment Build did not display staging logs",
-				log.contains("Downloaded app package"));
-		
-		// Wait for 5 sec
-		// Now stop the other thread and validate that there are no errors.
-		Thread.sleep(5000);
-		requester.stop();
-		requesterThread.join();
-
-		assertTrue (requester.getReqCount() > 0);
-		assertTrue (requester.getSuccessResCount() > 0);
-		assertTrue (requester.getErrorResCount() == 0);
-
-		// Verifying New Route of Green Deployment does not exist
-		System.out.println("Green App URI : " + cf.getAppURIs().get(1));
-		String greenUri = cf.getAppURIs().get(1);
-		request = Request.Get(greenUri);
-		response = request.execute().returnResponse();
-		statusCode = response.getStatusLine().getStatusCode();
-		assertEquals("Green App Get request did not respond 404 Not Found",
-				404, statusCode);
-		
-		requester = new BGRequester(uri);
-		requester.setContentToValidate("2.2.2.2");
-		requester.doContentValidation(true);
-		Thread requesterThread1 = new Thread(requester);
-		requesterThread1.start();
-		Thread.sleep(10000);
-		requester.stop();
-		requesterThread1.join();
-
-		assertTrue (requester.getReqCount() > 0);
-		assertTrue (requester.getSuccessResCount() > 0);
-		assertEquals ("There are error responses for the new version of the app.",0,requester.getErrorResCount());
-		
-		//TODO:  Additinal verifications for blue app not present.
-		// Check for blueApp_old if the retainOrigApp setting is true
-		
-
-	}
+   	}
+   	
+	
 
 }

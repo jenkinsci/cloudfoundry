@@ -78,12 +78,10 @@ public class CloudFoundryPushPublisher extends Recorder {
         this.credentialsId = credentialsId;
         this.selfSigned = selfSigned;
         if(existingAppHandler == null) {
-        	System.out.println(" existingAppHandler is null. Creating default.");
         	this.existingAppHandler = ExistingAppHandler.getDefault();
         }
         else
         {
-        	System.out.println(" existingAppHandler is NOT null. Setting value as "+existingAppHandler.value + " and retainOrigApp as "+existingAppHandler.retainOrigApp);
         	this.existingAppHandler = existingAppHandler;
         }
         if (manifestChoice == null) {
@@ -220,23 +218,27 @@ public class CloudFoundryPushPublisher extends Recorder {
 		addRoutesToApplication(client,deploymentInfo.getAppName(),blueRoutes);
 		deleteRoutesFromApplication(client,deploymentInfo.getBlueAppName(),blueRoutes);
 		deleteRoutesFromApplication(client,deploymentInfo.getAppName(),greenRoutes);
-		
-		
-		// TODO: Handle retain app flag here.
-		// IF false, delete blueApp
-		// IF true, cehck for blueApp_old, if exists delete
-		// Rename blueApp to blueApp_Old
+		client.deleteRoute(deploymentInfo.getHostname(), deploymentInfo.getDomain());
 	}
 	
 	private void doAppRenamingForBlueGreenDeployment(
 			CloudFoundryClient client, DeploymentInfo deploymentInfo) {
-		
-		// TODO: Handle retain app flag here.
-		// IF false, delete blueApp
-		// IF true, cehck for blueApp_old, if exists delete
-		// Rename blueApp to blueApp_Old
-		
-		//Now rename greenApp to blueApp
+		String blueAppName = deploymentInfo.getBlueAppName();
+		String retainedAppName = blueAppName + "_old";
+		if (existingAppHandler.retainOrigApp) {
+			handleAppRetention(client, blueAppName, retainedAppName);
+		} else  {
+			client.deleteApplication(blueAppName);
+		}
+		// Rename green app to blue app
+		client.rename(deploymentInfo.getAppName(), blueAppName);
+	}
+
+	protected void handleAppRetention(CloudFoundryClient client, String blueAppName, String retainedAppName) {
+		if (doesAppExist(client, retainedAppName)) {
+			client.deleteApplication(retainedAppName);
+		}
+		client.rename(blueAppName, retainedAppName);
 	}
     
     private boolean processOneApp(CloudFoundryClient client, DeploymentInfo deploymentInfo, AbstractBuild build,
@@ -248,7 +250,7 @@ public class CloudFoundryPushPublisher extends Recorder {
             // This is where we would create services, if we decide to add that feature.
             // List<CloudService> cloudServices = deploymentInfo.getServices();
             // client.createService();
-            CloudApplication existingApp = getExistingApp(client,deploymentInfo.getAppName());
+            CloudApplication existingApp = getExistingApp(listener,client,deploymentInfo.getAppName());
             listener.getLogger().println("Existing app with the same name : "+existingApp);
             handleExistingApp(client,listener,existingApp);
             updateDeploymentInfo(existingApp, listener, deploymentInfo);
@@ -367,25 +369,21 @@ public class CloudFoundryPushPublisher extends Recorder {
         }
     }
     
-    private CloudApplication getExistingApp(CloudFoundryClient client,String appName) {
-	    	//For some reason the following code block was resulting in Jenkins build error
-	    	//client.getApplication(deploymentInfo.getAppName());
-	    	CloudApplication existingApp = null;
-	    	for (CloudApplication app : client.getApplications()) {
-				if (app.getName().equals(appName)) {
-					existingApp = app;
-					break;
-				}
-			}
-	    	return existingApp;
-    }
+	private CloudApplication getExistingApp(BuildListener listener, CloudFoundryClient client, String appName) {
+		CloudApplication existingApp = null;
+		try {
+			existingApp = client.getApplication(appName);
+		} catch (CloudFoundryException cfe) {
+			listener.getLogger().println("INFO: No app found with name " + appName);
+		}
+		return existingApp;
+	}
 
     private void handleExistingApp(CloudFoundryClient client,
 			BuildListener listener, CloudApplication app) {
 	    	if(null == app) {
 	    		return;
 	    	}
-	    		
 	    	if (existingAppHandler.value.equals(ExistingAppHandler.Choice.RECREATE.toString())) {
             listener.getLogger().println("App already exists, resetting.");
             client.deleteApplication(app.getName());
@@ -393,19 +391,18 @@ public class CloudFoundryPushPublisher extends Recorder {
         } 
 	}
     
-    private void updateDeploymentInfo(CloudApplication existingApp, BuildListener listener, DeploymentInfo deploymentInfo) {
-	    	if(null == existingApp) {
-	    		deploymentInfo.setCreateNewApp(true);
-	    		return;
-	    	}
-	    	if( existingAppHandler.value.equals(ExistingAppHandler.Choice.RECREATE.toString())) {
-	    		deploymentInfo.setCreateNewApp(true);
-	    	}
-	    	else if( existingAppHandler.value.equals(ExistingAppHandler.Choice.BGDEPLOY.toString())) {
-	    		String appName = existingApp.getName();
-	    	    String appHostname = deploymentInfo.getHostname();
-            listener.getLogger().println("App already exists, Blue/Green deployment scenario");
-            String suffix = UUID.randomUUID().toString();
+	private void updateDeploymentInfo(CloudApplication existingApp, BuildListener listener, DeploymentInfo deploymentInfo) {
+		if (null == existingApp) {
+			deploymentInfo.setCreateNewApp(true);
+			return;
+		}
+		if (existingAppHandler.value.equals(ExistingAppHandler.Choice.RECREATE.toString())) {
+			deploymentInfo.setCreateNewApp(true);
+		} else if (existingAppHandler.value.equals(ExistingAppHandler.Choice.BGDEPLOY.toString())) {
+			String appName = existingApp.getName();
+			String appHostname = deploymentInfo.getHostname();
+			listener.getLogger().println("App already exists, Blue/Green deployment scenario");
+			String suffix = UUID.randomUUID().toString();
 			String greenAppName = appName + "-" + suffix;
 			String greenAppHostname = appHostname + "-" + suffix;
 			deploymentInfo.setBlueAppName(appName);
@@ -414,9 +411,9 @@ public class CloudFoundryPushPublisher extends Recorder {
 			deploymentInfo.setCreateNewApp(true);
 			deploymentInfo.setBlueRoutes(existingApp.getUris());
 			deploymentInfo.setBGDeployment(true);
-        }
-		
-    }
+		}
+
+	}
 
 	private void createApplication(CloudFoundryClient client,
 			BuildListener listener, DeploymentInfo deploymentInfo, String appURI) {
@@ -545,7 +542,6 @@ public class CloudFoundryPushPublisher extends Recorder {
     	 
     	@DataBoundConstructor
     	public ExistingAppHandler( String value, boolean retainOrigApp) {
-    		System.out.println("Invoked ExistingAppHandler with value "+value + " and retainOrigApp as "+retainOrigApp);
     		if(value == null) {
     			this.value = Choice.RESTART.toString();
     		}
@@ -833,5 +829,14 @@ public class CloudFoundryPushPublisher extends Recorder {
 		List<String> routes = client.getApplication(appName).getUris();
 		routes.removeAll(routesToRemove);
 		client.updateApplicationUris(appName, routes);
+	}
+	
+	public boolean doesAppExist(CloudFoundryClient client, String appName) {
+		try {
+			client.getApplication(appName);
+			return true;
+		} catch (CloudFoundryException cfe) {
+			return false;
+		}
 	}
 }
