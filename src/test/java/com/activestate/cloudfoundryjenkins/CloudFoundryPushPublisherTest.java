@@ -29,7 +29,6 @@ import org.cloudfoundry.client.lib.CloudFoundryClient;
 import org.cloudfoundry.client.lib.domain.CloudService;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.jvnet.hudson.test.ExtractResourceSCM;
@@ -350,7 +349,7 @@ public class CloudFoundryPushPublisherTest {
 
     // All the tests below are failure cases
 
-    @Ignore
+    @Test
     @WithTimeout(300)
     public void testPerformCustomTimeout() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
@@ -377,7 +376,7 @@ public class CloudFoundryPushPublisherTest {
                 log.contains("ERROR: The application failed to start after"));
     }
 
-    @Ignore 
+    @Test 
     public void testPerformEnvVarsManifestFile() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("python-env.zip")));
@@ -406,7 +405,7 @@ public class CloudFoundryPushPublisherTest {
         assertTrue("App did not have correct ENV_VAR_THREE", content.contains("ENV_VAR_THREE: value3"));
     }
 
-    @Ignore 
+    @Test 
     public void testPerformServicesNamesManifestFile() throws Exception {
         CloudService service1 = new CloudService();
         service1.setName("mysql_service1");
@@ -446,7 +445,7 @@ public class CloudFoundryPushPublisherTest {
         assertTrue("App did not have mysql_service2 bound", content.contains("mysql_service2"));
     }
 
-    @Ignore
+    @Test
     public void testPerformNoRoute() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
@@ -476,7 +475,7 @@ public class CloudFoundryPushPublisherTest {
         assertEquals("Get request did not respond 404 Not Found", 404, statusCode);
     }
 
-    @Ignore
+    @Test
     public void testPerformUnknownHost() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
@@ -493,7 +492,7 @@ public class CloudFoundryPushPublisherTest {
         assertTrue("Build did not write error message", s.contains("ERROR: Unknown host"));
     }
 
-    @Ignore
+    @Test
     public void testPerformWrongCredentials() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
