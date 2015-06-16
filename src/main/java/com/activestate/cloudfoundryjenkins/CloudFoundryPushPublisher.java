@@ -251,8 +251,7 @@ public class CloudFoundryPushPublisher extends Recorder {
             // List<CloudService> cloudServices = deploymentInfo.getServices();
             // client.createService();
             CloudApplication existingApp = getExistingApp(listener,client,deploymentInfo.getAppName());
-            listener.getLogger().println("Existing app with the same name : "+existingApp);
-            handleExistingApp(client,listener,existingApp);
+            handleExistingApp(existingApp, listener, client);
             updateDeploymentInfo(existingApp, listener, deploymentInfo);
             
             String appName = deploymentInfo.getAppName();
@@ -379,16 +378,16 @@ public class CloudFoundryPushPublisher extends Recorder {
 		return existingApp;
 	}
 
-    private void handleExistingApp(CloudFoundryClient client,
-			BuildListener listener, CloudApplication app) {
-	    	if(null == app) {
-	    		return;
-	    	}
-	    	if (existingAppHandler.value.equals(ExistingAppHandler.Choice.RECREATE.toString())) {
-            listener.getLogger().println("App already exists, resetting.");
-            client.deleteApplication(app.getName());
-            listener.getLogger().println("App deleted.");
-        } 
+	private void handleExistingApp(CloudApplication existingApp, BuildListener listener, CloudFoundryClient client) {
+		if (null == existingApp) {
+			return;
+		}
+		listener.getLogger().println("Existing app with the same name : " + existingApp);
+		if (existingAppHandler.value.equals(ExistingAppHandler.Choice.RECREATE.toString())) {
+			listener.getLogger().println("App already exists, resetting.");
+			client.deleteApplication(existingApp.getName());
+			listener.getLogger().println("App deleted.");
+		}
 	}
     
 	private void updateDeploymentInfo(CloudApplication existingApp, BuildListener listener, DeploymentInfo deploymentInfo) {
@@ -402,7 +401,7 @@ public class CloudFoundryPushPublisher extends Recorder {
 			String appName = existingApp.getName();
 			String appHostname = deploymentInfo.getHostname();
 			listener.getLogger().println("App already exists, Blue/Green deployment scenario");
-			String suffix = getGreenAppNameSuffix();
+			String suffix = UUID.randomUUID().toString();
 			String greenAppName = appName + "-" + suffix;
 			String greenAppHostname = appHostname + "-" + suffix;
 			deploymentInfo.setBlueAppName(appName);
@@ -413,14 +412,6 @@ public class CloudFoundryPushPublisher extends Recorder {
 			deploymentInfo.setBGDeployment(true);
 		}
 
-	}
-
-	private String getGreenAppNameSuffix() {
-		String suffix = System.getenv("BUILD_TAG");
-		if ((suffix == null) || (suffix.trim().length() == 0)) {
-			suffix = UUID.randomUUID().toString();
-		}
-		return suffix;
 	}
 
 	private void createApplication(CloudFoundryClient client,
