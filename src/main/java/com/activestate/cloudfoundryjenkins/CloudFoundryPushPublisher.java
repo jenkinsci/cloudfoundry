@@ -402,7 +402,7 @@ public class CloudFoundryPushPublisher extends Recorder {
 			String appName = existingApp.getName();
 			String appHostname = deploymentInfo.getHostname();
 			listener.getLogger().println("App already exists, Blue/Green deployment scenario");
-			String suffix = UUID.randomUUID().toString();
+			String suffix = getGreenAppNameSuffix();
 			String greenAppName = appName + "-" + suffix;
 			String greenAppHostname = appHostname + "-" + suffix;
 			deploymentInfo.setBlueAppName(appName);
@@ -413,6 +413,14 @@ public class CloudFoundryPushPublisher extends Recorder {
 			deploymentInfo.setBGDeployment(true);
 		}
 
+	}
+
+	private String getGreenAppNameSuffix() {
+		String suffix = System.getenv("BUILD_TAG");
+		if ((suffix == null) || (suffix.trim().length() == 0)) {
+			suffix = UUID.randomUUID().toString();
+		}
+		return suffix;
 	}
 
 	private void createApplication(CloudFoundryClient client,
