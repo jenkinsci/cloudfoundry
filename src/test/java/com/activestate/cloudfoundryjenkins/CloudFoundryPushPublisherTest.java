@@ -615,8 +615,11 @@ public class CloudFoundryPushPublisherTest {
 		CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE, "testCredentialsId", false, new ExistingAppHandler(
 				ExistingAppHandler.Choice.BGDEPLOY.toString(), retainOrigApp), manifest);
 		project.getPublishersList().add(cf);
+		
 		FreeStyleBuild build = project.scheduleBuild2(0).get();
-		String uri = validateBlueAppDeployment(cf, build);
+		String uri = cf.getAppURIs().get(0);
+		validateBlueAppDeployment(cf, build,uri);
+		
 		// Start Another Thread that continously queries app
 		// This thread keeps a counter of # requests sent, success and failures
 		// Now initiate another build, this time it will be a BG deployment
@@ -633,25 +636,31 @@ public class CloudFoundryPushPublisherTest {
 		validateGreenAppDeployment(build);
 		// Wait for 5 sec
 		// Now stop the other thread and validate that there are no errors.
-		Thread.sleep(5000);
-		requester.stop();
-		requesterThread.join();
-		assertTrue(requester.getReqCount() > 0);
-		assertTrue(requester.getSuccessResCount() > 0);
-		assertTrue(requester.getErrorResCount() == 0);
+		waitAndStopRequester(requester, requesterThread,5000);
+		
+		validateRequesterData(requester);
 		validateGreenRouteRemoval(cf);
+		
 		requester = new BGRequester(uri);
 		requester.setContentToValidate("2.2.2.2");
 		requester.doContentValidation(true);
 		Thread requesterThread1 = new Thread(requester);
 		requesterThread1.start();
-		Thread.sleep(10000);
+		waitAndStopRequester(requester, requesterThread1, 10000);
+		validateRequesterData(requester);
+		validateAppRetentionFlag(retainOrigApp, manifest, cf);
+	}
+
+	private void waitAndStopRequester(BGRequester requester, Thread requesterThread, long waitTimeInMillis) throws InterruptedException {
+		Thread.sleep(waitTimeInMillis);
 		requester.stop();
-		requesterThread1.join();
+		requesterThread.join();
+	}
+
+	private void validateRequesterData(BGRequester requester) {
 		assertTrue(requester.getReqCount() > 0);
 		assertTrue(requester.getSuccessResCount() > 0);
-		assertEquals("There are error responses for the new version of the app.", 0, requester.getErrorResCount());
-		validateAppRetentionFlag(retainOrigApp, manifest, cf);
+		assertEquals("There are error responses for the app.", 0, requester.getErrorResCount());
 	}
 
 	protected void validateGreenAppDeployment(FreeStyleBuild build) throws IOException {
@@ -680,8 +689,6 @@ public class CloudFoundryPushPublisherTest {
 	}
 
 	private void validateAppRetentionFlag(boolean retainOrigApp, ManifestChoice manifest, CloudFoundryPushPublisher cf) {
-		// If (retainOrigApp), verify that blueAppname_old is present
-		// else verify that no blueAppName_old is present.
 		if (retainOrigApp) {
 			System.out.println("Config is to retain Blue App.  Checking for " + manifest.appName + "_old");
 			assertTrue(cf.doesAppExist(client, manifest.appName + "_old"));
@@ -693,7 +700,7 @@ public class CloudFoundryPushPublisherTest {
 		assertTrue(cf.doesAppExist(client, manifest.appName));
 	}
 
-	private String validateBlueAppDeployment(CloudFoundryPushPublisher cf, FreeStyleBuild build) throws IOException, ClientProtocolException {
+	private void validateBlueAppDeployment(CloudFoundryPushPublisher cf, FreeStyleBuild build, String uri) throws IOException, ClientProtocolException {
 		String log = FileUtils.readFileToString(build.getLogFile());
 		System.out.println(log);
 
@@ -703,7 +710,6 @@ public class CloudFoundryPushPublisherTest {
 		// Verifying Orig Route to Orig App Is Correct
 		System.out.println("Blue App URI : " + cf.getAppURIs().get(0));
 
-		String uri = cf.getAppURIs().get(0);
 		Request request = Request.Get(uri);
 		HttpResponse response = request.execute().returnResponse();
 		int statusCode = response.getStatusLine().getStatusCode();
@@ -711,7 +717,6 @@ public class CloudFoundryPushPublisherTest {
 		String content = EntityUtils.toString(response.getEntity());
 		System.out.println(content);
 		assertTrue("Blue App did not send back correct text", content.contains("1.1.1.1"));
-		return uri;
 	}
    	
 	
