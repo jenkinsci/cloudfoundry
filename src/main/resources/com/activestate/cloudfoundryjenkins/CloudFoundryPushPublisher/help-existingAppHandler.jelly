@@ -1,7 +1,7 @@
 <div>
   <b> Handle Existing Application </b>
   <BR/>
-  There are three options for handling the case of an application being pushed to CloudFoundry finds that another application with the same name exists.
+  If an application being pushed to CloudFoundry already exists, the plugin can perform one of the following three operations.
   <BR/>
   <BR/>
   <li> Blue/Green deployment </li>
@@ -9,7 +9,7 @@
   <li> Push App and Restart </li>
   <p>
   
-  <b> Note that the plugin uses application name as the key. </b>
+  <b> Note that the plugin uses application name as the key to determine whether an application already exists in the configured org and space. </b>
   
   </p>
   <div>
