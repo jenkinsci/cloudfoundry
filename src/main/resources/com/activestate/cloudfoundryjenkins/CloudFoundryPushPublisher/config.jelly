@@ -17,8 +17,9 @@
   </f:entry>
   <f:validateButton title="Test Connection" progress="Testing..." method="testConnection"
                     with="target,username,password,credentialsId,organization,cloudSpace,selfSigned"/>
-  
-  <f:entry title="Handle Existing Application :" field="existingAppHandler">
+
+  <f:entry title="Handle Existing Application :" field="existingAppHandlerHeading">
+   </f:entry>
   <f:radioBlock title="Blue/Green Deployment" name="existingAppHandler" value="BGDEPLOY"
                 checked="${instance.existingAppHandler.value == 'BGDEPLOY'}">
          <f:entry title="Do Not Delete Blue (orig) instance" field="retainOrigApp">
@@ -31,7 +32,29 @@
   <f:radioBlock title="Push App and Restart" name="existingAppHandler" value="RESTART" 
                 checked="${instance.existingAppHandler.value != 'RECREATE' &amp;&amp; instance.existingAppHandler.value != 'BGDEPLOY'}">
   </f:radioBlock>
- </f:entry>
+
+
+  <f:entry title="Create services before pushing" field="createServices">
+    <f:repeatable var="servicesToCreate" items="${instance.servicesToCreate}">
+      <table width="100%">
+        <f:entry title="Name" field="name">
+          <f:textbox value="${servicesToCreate.name}"/>
+        </f:entry>
+        <f:entry title="Type" field="type">
+          <f:textbox value="${servicesToCreate.type}"/>
+        </f:entry>
+        <f:entry title="Plan" field="plan">
+          <f:textbox value="${servicesToCreate.plan}"/>
+        </f:entry>
+        <f:entry title="Reset service if already exists" field="resetService">
+          <f:checkbox checked="${servicesToCreate.resetService}"/>
+        </f:entry>
+      </table>
+      <div align="right">
+        <f:repeatableDeleteButton/>
+      </div>
+    </f:repeatable>
+  </f:entry>
 
   <f:radioBlock title="Read configuration from a manifest file" name="manifestChoice" value="manifestFile"
                 checked="${instance.manifestChoice.value != 'jenkinsConfig'}">

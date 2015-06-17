@@ -1,0 +1,8 @@
+<div>
+  If your application requires a service to be bound to the app, that service needs to be created beforehand.
+  <br/>
+  Use this option to create services automatically instead of having to do it manually.
+  <br/>
+  By default, the plugin will not overwrite existing services, so you can use this with no risk if you just want to make
+  sure the app will work straight away.
+</div>

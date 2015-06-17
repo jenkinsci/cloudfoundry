@@ -1,0 +1,7 @@
+<div>
+  By default, if a service with the same name already exists, the plugin will cancel the creation of the new service.
+  <br/>
+  Checking this box will delete the service before creating the new one, which allows you to overwrite it.
+  <br/>
+  This can be useful if, for instance, you want to reset your database while pushing a new version of your app.
+</div>
