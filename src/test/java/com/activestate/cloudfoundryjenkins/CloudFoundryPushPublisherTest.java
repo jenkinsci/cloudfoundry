@@ -679,52 +679,104 @@ public class CloudFoundryPushPublisherTest {
 
    		doBGDeployment(false);
     }
+    
+    @Test
+    public void  testPerformBGWithNoRouteForOrigApp() throws Exception {
+	   doBGDeployment(false,true,false);
+    }
+    
+    @Test
+    public void  testPerformBGWithGreenAppPushFailure() throws Exception {
+	   doBGDeployment(false,false,true);
+    }
 
-	private void doBGDeployment(boolean retainOrigApp) throws IOException, InterruptedException, ExecutionException, ClientProtocolException {
+    private void doBGDeployment(boolean retainOrigApp) throws IOException, InterruptedException, ExecutionException, ClientProtocolException {
+    		doBGDeployment(retainOrigApp,false, false);
+    }
+	private void doBGDeployment(boolean retainOrigApp, boolean noRoute, boolean makeGreenAppFail) throws IOException, InterruptedException, ExecutionException, ClientProtocolException {
 		FreeStyleProject project = j.createFreeStyleProject();
 		project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
 		EnvironmentVariable sshConnENVv1 = new EnvironmentVariable("SSH_CONNECTION", "Hub Port 1.1.1.1 None");
 		List<EnvironmentVariable> envVars = new ArrayList<EnvironmentVariable>();
 		envVars.add(sshConnENVv1);
-		ManifestChoice manifest = new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 0, 0, false, "target/hello-java-1.0.war", "", "", "", envVars,
+		ManifestChoice manifest = new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 0, 0, noRoute, "target/hello-java-1.0.war", "", "", "", envVars,
 				new ArrayList<ServiceName>());
+		
 		CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE, "testCredentialsId", false, new ExistingAppHandler(
 				ExistingAppHandler.Choice.BGDEPLOY.toString(), retainOrigApp),null, manifest);
 		project.getPublishersList().add(cf);
 		
 		FreeStyleBuild build = project.scheduleBuild2(0).get();
-		String uri = cf.getAppURIs().get(0);
-		validateBlueAppDeployment(cf, build,uri);
+		String uri = null;
+		BGRequester requester =null;
+		Thread requesterThread =null;
+		if(!noRoute) {
+			uri=cf.getAppURIs().get(0);
 		
-		// Start Another Thread that continously queries app
-		// This thread keeps a counter of # requests sent, success and failures
-		// Now initiate another build, this time it will be a BG deployment
-		BGRequester requester = new BGRequester(uri);
-		Thread requesterThread = new Thread(requester);
-		requesterThread.start();
-		// Sleep for 5 seconds before doing another push
-		Thread.sleep(5000);
+			validateBlueAppDeployment(cf, build,uri);
+			
+			// Start Another Thread that continously queries app
+			// This thread keeps a counter of # requests sent, success and failures
+			// Now initiate another build, this time it will be a BG deployment
+			 requester = new BGRequester(uri);
+			 requesterThread = new Thread(requester);
+			requesterThread.start();
+			// Sleep for 5 seconds before doing another push
+			Thread.sleep(5000);
+		}
+		else {
+			validateBlueAppDeployment(cf, build,null);
+		}
+
+		ManifestChoice failureManifest =null;
+		CloudFoundryPushPublisher failureCf = null;
 		// Update Env Var
 		envVars.clear();
-		EnvironmentVariable sshConnENVv2 = new EnvironmentVariable("SSH_CONNECTION", "Hub Port 2.2.2.2 None");
-		envVars.add(sshConnENVv2);
+		if(!makeGreenAppFail) {
+			EnvironmentVariable sshConnENVv2 = new EnvironmentVariable("SSH_CONNECTION", "Hub Port 2.2.2.2 None");
+			envVars.add(sshConnENVv2);
+		}
+		else
+		{
+			 failureManifest = new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 0, 0, noRoute, "target/hello-java-1.0.war", "", "failedbuild", "", envVars,
+					new ArrayList<ServiceName>());
+			 failureCf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE, "testCredentialsId", false, new ExistingAppHandler(
+					ExistingAppHandler.Choice.BGDEPLOY.toString(), retainOrigApp),null, failureManifest);
+			project.getPublishersList().clear();
+			project.getPublishersList().add(failureCf);
+		}
 		build = project.scheduleBuild2(0).get();
-		validateGreenAppDeployment(build);
-		// Wait for 5 sec
-		// Now stop the other thread and validate that there are no errors.
-		waitAndStopRequester(requester, requesterThread,5000);
+		if((!noRoute) && (!makeGreenAppFail)) {
+			validateGreenAppDeployment(build);
+			// Wait for 5 sec
+			// Now stop the other thread and validate that there are no errors.
+			waitAndStopRequester(requester, requesterThread,5000);
+			
+			validateRequesterData(requester);
+			validateGreenRouteRemoval(cf);
+			
+			requester = new BGRequester(uri);
+			requester.setContentToValidate("2.2.2.2");
+			requester.doContentValidation(true);
+			Thread requesterThread1 = new Thread(requester);
+			requesterThread1.start();
+			waitAndStopRequester(requester, requesterThread1, 10000);
+			validateRequesterData(requester);
+			validateAppRetentionFlag(retainOrigApp, manifest, cf);
+			
+		} 
+		else if(noRoute) {
+			assertTrue(build.getResult().isWorseThan(Result.SUCCESS));
+		}
+		else if(makeGreenAppFail) {
+			assertTrue(cf.doesAppExist(client, failureManifest.appName));
+			assertTrue(build.getResult().isWorseThan(Result.SUCCESS));
+			String greenAppURI = failureCf.getAppURIs().get(0);
+			HttpResponse response = performGet(greenAppURI);
+			assertEquals("Get on Green App URL did not respond with http 404",404,response.getStatusLine().getStatusCode());
+		}
 		
-		validateRequesterData(requester);
-		validateGreenRouteRemoval(cf);
 		
-		requester = new BGRequester(uri);
-		requester.setContentToValidate("2.2.2.2");
-		requester.doContentValidation(true);
-		Thread requesterThread1 = new Thread(requester);
-		requesterThread1.start();
-		waitAndStopRequester(requester, requesterThread1, 10000);
-		validateRequesterData(requester);
-		validateAppRetentionFlag(retainOrigApp, manifest, cf);
 	}
 
 	private void waitAndStopRequester(BGRequester requester, Thread requesterThread, long waitTimeInMillis) throws InterruptedException {
@@ -776,6 +828,11 @@ public class CloudFoundryPushPublisherTest {
 		assertTrue(cf.doesAppExist(client, manifest.appName));
 	}
 
+	
+	private HttpResponse performGet(String uri) throws ClientProtocolException, IOException {
+		Request request = Request.Get(uri);
+		return request.execute().returnResponse();
+	}
 	private void validateBlueAppDeployment(CloudFoundryPushPublisher cf, FreeStyleBuild build, String uri) throws IOException, ClientProtocolException {
 		String log = FileUtils.readFileToString(build.getLogFile());
 		System.out.println(log);
@@ -784,15 +841,16 @@ public class CloudFoundryPushPublisherTest {
 		assertTrue("Blue Deployment Build did not display staging logs", log.contains("Downloaded app package"));
 
 		// Verifying Orig Route to Orig App Is Correct
-		System.out.println("Blue App URI : " + cf.getAppURIs().get(0));
-
-		Request request = Request.Get(uri);
-		HttpResponse response = request.execute().returnResponse();
-		int statusCode = response.getStatusLine().getStatusCode();
-		assertEquals("Blue App  Get request did not respond 200 OK", 200, statusCode);
-		String content = EntityUtils.toString(response.getEntity());
-		System.out.println(content);
-		assertTrue("Blue App did not send back correct text", content.contains("1.1.1.1"));
+		if(uri != null) {
+			System.out.println("Blue App URI : " + uri);
+			HttpResponse response = performGet(uri);
+			int statusCode = response.getStatusLine().getStatusCode();
+			assertEquals("Blue App  Get request did not respond 200 OK", 200, statusCode);
+			String content = EntityUtils.toString(response.getEntity());
+			System.out.println(content);
+			assertTrue("Blue App did not send back correct text", content.contains("1.1.1.1"));
+		}
+		
 	}
    	
 	

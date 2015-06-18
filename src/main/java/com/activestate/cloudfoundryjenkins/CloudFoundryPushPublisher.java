@@ -187,10 +187,12 @@ public class CloudFoundryPushPublisher extends Recorder {
             for (DeploymentInfo deploymentInfo : allDeploymentInfo) {
                 boolean lastSuccess = processOneApp(client, deploymentInfo, build, listener);
                 //do post processing here.
-                if(lastSuccess && deploymentInfo.isBGDeployment()) {
-                		doRouteRemappingForBlueGreenDeployment(client,
-								deploymentInfo);
-                		doAppRenamingForBlueGreenDeployment(client,deploymentInfo);
+                if(lastSuccess) {
+                		postProcessBGDeployment(client, deploymentInfo,listener);
+                }
+                else
+                {
+                		handleFailureForBGDeployment(client, deploymentInfo,listener,"Error in pushing green app");
                 }
                 // If an app fails, the build status is failure, but we should still try pushing them
                 success = success && lastSuccess;
@@ -234,31 +236,82 @@ public class CloudFoundryPushPublisher extends Recorder {
             return false;
         } catch (Exception e) {
             e.printStackTrace(listener.getLogger());
-            e.printStackTrace();
             return false;
         }
         catch (Throwable th) {
             th.printStackTrace(listener.getLogger());
-            th.printStackTrace();
             return false;
         }
     }
+    
+    private void handleFailureForBGDeployment(CloudFoundryClient client,
+			DeploymentInfo deploymentInfo, BuildListener listener, String errorMessage) {
+		if(!deploymentInfo.isBGDeployment())
+		{
+			return;
+		}
+		if(doesAppExist(client, deploymentInfo.getAppName())) {
+			listener.getLogger().println("Blue/Green deployment : "+errorMessage);
+			listener.getLogger().println("Stopping the green app "+deploymentInfo.getAppName());
+			client.stopApplication(deploymentInfo.getAppName());
+		}
+				
+		
+	}
+
+	private void postProcessBGDeployment(CloudFoundryClient client,
+			DeploymentInfo deploymentInfo, BuildListener listener) {
+		if(!deploymentInfo.isBGDeployment())
+		{
+			return;
+		}
+		try 
+		{
+			doRouteRemappingForBlueGreenDeployment(client,
+					deploymentInfo,listener);
+			doAppRenamingForBlueGreenDeployment(client,deploymentInfo,listener);
+		}
+		catch (CloudFoundryException cfe) {
+			cfe.printStackTrace(listener.getLogger());
+			handleFailureForBGDeployment(client, deploymentInfo, listener, "Blue/Green Deployment : Failure in route remapping / renaming of app: "+cfe.getMessage());
+		}
+		
+	}
 
 	private void doRouteRemappingForBlueGreenDeployment(
-			CloudFoundryClient client, DeploymentInfo deploymentInfo) {
-		String greenRoute = deploymentInfo.getHostname()+"."+deploymentInfo.getDomain();
-		List<String> greenRoutes = new ArrayList<String>(1);
-		greenRoutes.add(greenRoute);
+			CloudFoundryClient client, DeploymentInfo deploymentInfo,  BuildListener listener) {
+		
 		
 		List<String> blueRoutes = deploymentInfo.getBlueRoutes();
-		addRoutesToApplication(client,deploymentInfo.getAppName(),blueRoutes);
-		deleteRoutesFromApplication(client,deploymentInfo.getBlueAppName(),blueRoutes);
-		deleteRoutesFromApplication(client,deploymentInfo.getAppName(),greenRoutes);
-		client.deleteRoute(deploymentInfo.getHostname(), deploymentInfo.getDomain());
+		for( String route : blueRoutes) {
+			listener.getLogger().println("Blue Route: "+route);
+		}
+		
+		String blueAppName = deploymentInfo.getBlueAppName();
+		String greenHostName = deploymentInfo.getHostname();
+		String greenAppName = deploymentInfo.getAppName();
+		String domain = deploymentInfo.getDomain();
+		
+		String greenRoute = greenHostName+"."+domain;
+		List<String> greenRoutes = new ArrayList<String>(1);
+		listener.getLogger().println("Green Route: "+greenRoute);
+		greenRoutes.add(greenRoute);
+		
+		listener.getLogger().println("Adding routes to  "+greenAppName);
+		logRoutes(listener, blueRoutes);
+		addRoutesToApplication(client,greenAppName,blueRoutes,listener);
+		listener.getLogger().println("Deleting routes from  "+blueAppName);
+		logRoutes(listener, blueRoutes);
+		deleteRoutesFromApplication(client,blueAppName,blueRoutes,listener);
+		listener.getLogger().println("Deleting routes from  "+greenAppName);
+		logRoutes(listener, greenRoutes);
+		deleteRoutesFromApplication(client,greenAppName,greenRoutes,listener);
+		listener.getLogger().println("Deleting the green route : "+greenRoute);
+		client.deleteRoute(greenHostName, domain);
 	}
 	
 	private void doAppRenamingForBlueGreenDeployment(
-			CloudFoundryClient client, DeploymentInfo deploymentInfo) {
+			CloudFoundryClient client, DeploymentInfo deploymentInfo, BuildListener listener) {
 		String blueAppName = deploymentInfo.getBlueAppName();
 		String retainedAppName = blueAppName + "_old";
 		if (existingAppHandler.retainOrigApp) {
@@ -290,6 +343,10 @@ public class CloudFoundryPushPublisher extends Recorder {
             handleExistingApp(existingApp, listener, client);
             updateDeploymentInfo(existingApp, listener, deploymentInfo);
             
+            if(deploymentInfo.isBGDeployment() && existingApp.getUris().isEmpty()) {
+            		String blueAppName = deploymentInfo.getBlueAppName();
+	    			throw new IllegalStateException("The existing application "+blueAppName+" does not have any routes. Aborting the Blue/Green Deployment" );
+	    		}
             String appName = deploymentInfo.getAppName();
             String appURI = "https://" + appName+ "." + deploymentInfo.getDomain();
             
@@ -865,11 +922,20 @@ public class CloudFoundryPushPublisher extends Recorder {
      * @param appName
      * @param newRoute
      */
-    private static void addRoutesToApplication(CloudFoundryClient client, String appName, List<String> newRoutes) throws CloudFoundryException  {
+    private static void addRoutesToApplication(CloudFoundryClient client, String appName, 
+    		List<String> newRoutes,BuildListener listener) throws CloudFoundryException  {
         List<String> routes = client.getApplication(appName).getUris();
         routes.addAll(newRoutes);
+        listener.getLogger().println("Updating the app "+appName+" with routes: ");
+        logRoutes(listener, routes);
         client.updateApplicationUris(appName, routes);
     }
+
+	private static void logRoutes(BuildListener listener, List<String> routes) {
+		for(String route : routes) {
+        		listener.getLogger().println(route);
+        }
+	}
     
     /**
      * Delete a route to an existing application.
@@ -877,9 +943,11 @@ public class CloudFoundryPushPublisher extends Recorder {
      * @param appName
      * @param newRoute
      */
-	private  static void deleteRoutesFromApplication(CloudFoundryClient client, String appName, List<String> routesToRemove) throws CloudFoundryException {
+	private  static void deleteRoutesFromApplication(CloudFoundryClient client, String appName, List<String> routesToRemove, BuildListener listener) throws CloudFoundryException {
 		List<String> routes = client.getApplication(appName).getUris();
 		routes.removeAll(routesToRemove);
+		listener.getLogger().println("Updating the app "+appName+" with routes: ");
+		logRoutes(listener, routes);
 		client.updateApplicationUris(appName, routes);
 	}
 	
