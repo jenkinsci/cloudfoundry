@@ -8,11 +8,12 @@ import com.activestate.cloudfoundryjenkins.CloudFoundryPushPublisher.DescriptorI
 import com.activestate.cloudfoundryjenkins.CloudFoundryPushPublisher.EnvironmentVariable;
 import com.activestate.cloudfoundryjenkins.CloudFoundryPushPublisher.ManifestChoice;
 import com.activestate.cloudfoundryjenkins.CloudFoundryPushPublisher.ServiceName;
+
 import hudson.model.AbstractBuild;
 import hudson.model.TaskListener;
+
 import org.jenkinsci.plugins.tokenmacro.MacroEvaluationException;
 import org.jenkinsci.plugins.tokenmacro.TokenMacro;
-
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Path;
@@ -39,9 +40,17 @@ public class DeploymentInfo {
     private String buildpack;
     private String command;
     private String domain;
+    private  boolean  isNewAppToBeCreated  = false;
+    private String origAppName;
+    private boolean isBlueGreenInitiated = false;
 
     private Map<String, String> envVars = new HashMap<String, String>();
     private List<String> servicesNames = new ArrayList<String>();
+	private boolean isBGDeployment;
+	private boolean createNewApp;
+	private String blueHostName;
+	private List<String> blueAppRoutes = new ArrayList<String>();
+	private String blueAppName;
 
     /**
      * Constructor for reading the manifest.yml file.
@@ -326,4 +335,76 @@ public class DeploymentInfo {
         return servicesNames;
     }
 
+    /**
+	 * @param appName
+	 *            the appName to set
+	 */
+	public void setAppName(String appName) {
+		this.appName = appName;
+	}
+
+	public void setHostname(String hostname) {
+		this.hostname = hostname;
+	}
+
+	public void setBGDeployment(boolean bgdeploy) {
+		this.isBGDeployment = bgdeploy ;
+		
+	}
+
+	public boolean isBGDeployment() {
+		return isBGDeployment;
+	}
+
+	public void setCreateNewApp(boolean createApp) {
+		this.createNewApp = createApp;
+		
+	}
+	
+	public boolean isCreateNewApp() {
+		return createNewApp;
+	}
+
+
+	/**
+	 * @return the origAppName
+	 */
+	public String getOrigAppName() {
+		return origAppName;
+	}
+
+	/**
+	 * @param origAppName the origAppName to set
+	 */
+	public void setOrigAppName(String origAppName) {
+		this.origAppName = origAppName;
+	}
+
+	public void setBlueHostname(String blueHost) {
+		this.blueHostName = blueHost;
+	}
+
+	public String getBlueHostname() {
+		return blueHostName;
+	}
+
+	public void setBlueRoutes(List<String> blueRoutes) {
+		this.blueAppRoutes .clear();
+		this.blueAppRoutes.addAll(blueRoutes);
+		
+	}
+
+	public List<String> getBlueRoutes() {
+		return blueAppRoutes;
+	}
+
+	public void setBlueAppName(String blueAppName) {
+		this.blueAppName = blueAppName;
+		
+	}
+
+	public String getBlueAppName() {
+		return blueAppName;
+	}
+	
 }

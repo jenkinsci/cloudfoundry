@@ -1,5 +1,0 @@
-<div>
-  By default, pushing an application that already exists will update its code, but not its push configuration.
-  <br/>
-  Checking this box will delete the application before pushing it, which allows you to cleanly reset it.
-</div>

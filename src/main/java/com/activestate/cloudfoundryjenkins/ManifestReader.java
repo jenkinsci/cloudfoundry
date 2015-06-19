@@ -5,6 +5,7 @@
 package com.activestate.cloudfoundryjenkins;
 
 import hudson.FilePath;
+
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.scanner.ScannerException;
 
@@ -27,7 +28,12 @@ public class ManifestReader {
 
     public ManifestReader(FilePath manifestFile) throws ManifestParsingException, IOException {
         this.manifestFile = manifestFile;
-        this.applicationList = parseManifest();
+        try {
+			this.applicationList = parseManifest();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
     }
 
     /**
@@ -73,9 +79,10 @@ public class ManifestReader {
 
     /**
      * Returns the list of maps describing the applications.
+     * @throws InterruptedException 
      */
     private List<Map<String, Object>> parseManifest()
-            throws IOException, ManifestParsingException {
+            throws IOException, ManifestParsingException, InterruptedException {
         InputStream inputStream = manifestFile.read();
         Yaml yaml = new Yaml();
         Object parsedYaml;

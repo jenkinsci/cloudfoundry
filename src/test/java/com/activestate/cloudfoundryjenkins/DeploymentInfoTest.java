@@ -7,10 +7,13 @@ package com.activestate.cloudfoundryjenkins;
 import com.activestate.cloudfoundryjenkins.CloudFoundryPushPublisher.EnvironmentVariable;
 import com.activestate.cloudfoundryjenkins.CloudFoundryPushPublisher.ManifestChoice;
 import com.activestate.cloudfoundryjenkins.CloudFoundryPushPublisher.ServiceName;
+import com.kenai.jffi.Array;
+
 import hudson.FilePath;
 import hudson.model.FreeStyleBuild;
 import hudson.model.FreeStyleProject;
 import hudson.model.TaskListener;
+
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -21,6 +24,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static com.activestate.cloudfoundryjenkins.CloudFoundryPushPublisher.DescriptorImpl.*;
 import static org.junit.Assert.*;
@@ -41,7 +45,7 @@ public class DeploymentInfoTest {
         Map<String, Object> appInfo = manifestReader.getApplicationInfo();
         DeploymentInfo deploymentInfo =
                 new DeploymentInfo(System.out, appInfo, "jenkins-build-name", "domain-name", "");
-
+        
         assertEquals("hello-java", deploymentInfo.getAppName());
         assertEquals(512, deploymentInfo.getMemory());
         assertEquals("testhost", deploymentInfo.getHostname());
@@ -64,6 +68,27 @@ public class DeploymentInfoTest {
         expectedServices.add("service_name_two");
         expectedServices.add("service_name_three");
         assertEquals(expectedServices, deploymentInfo.getServicesNames());
+        
+        UUID randomUUID = UUID.randomUUID();
+        String newAppName = "hello-java-"+randomUUID.toString();
+        String newHostName = "testhost-"+randomUUID.toString();
+        deploymentInfo.setBGDeployment(true);
+        deploymentInfo.setCreateNewApp(true);
+        deploymentInfo.setAppName(newAppName);
+        deploymentInfo.setHostname(newHostName);
+        List<String> blueRoutes = new ArrayList<String>();
+        blueRoutes.add("blue route");
+        
+        deploymentInfo.setBlueRoutes(blueRoutes);
+        deploymentInfo.setBlueHostname("hello-java");
+        deploymentInfo.setBlueAppName("hello-java");
+        assertEquals(newAppName, deploymentInfo.getAppName());
+        assertEquals(newHostName, deploymentInfo.getHostname());
+        assertEquals("hello-java", deploymentInfo.getBlueHostname());
+        assertEquals("hello-java", deploymentInfo.getBlueAppName());
+        assertEquals("blue route", deploymentInfo.getBlueRoutes().get(0));
+        assert(deploymentInfo.isBGDeployment());
+        assert(deploymentInfo.isCreateNewApp());
     }
 
     @Test
