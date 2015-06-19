@@ -30,6 +30,7 @@ import net.lingala.zip4j.exception.ZipException;
 
 import org.cloudfoundry.client.lib.*;
 import org.cloudfoundry.client.lib.domain.*;
+import org.cloudfoundry.client.lib.domain.CloudApplication.AppState;
 import org.cloudfoundry.client.lib.org.springframework.web.client.ResourceAccessException;
 import org.jenkinsci.plugins.tokenmacro.MacroEvaluationException;
 import org.kohsuke.stapler.AncestorInPath;
@@ -250,11 +251,17 @@ public class CloudFoundryPushPublisher extends Recorder {
 		{
 			return;
 		}
-		if(doesAppExist(client, deploymentInfo.getAppName())) {
-			listener.getLogger().println("Blue/Green deployment : "+errorMessage);
-			listener.getLogger().println("Stopping the green app "+deploymentInfo.getAppName());
-			client.stopApplication(deploymentInfo.getAppName());
+		String blueAppName = deploymentInfo.getBlueAppName();
+		String greenAppName = deploymentInfo.getAppName();
+		listener.getLogger().println("Blue/Green deployment : "+errorMessage);
+		if(checkAndRestoreRoute(client, deploymentInfo, listener, blueAppName)) {
+			listener.getLogger().println("Found blueApp in started state and restored its routes.");
+			if(doesAppExist(client, greenAppName)) {
+				listener.getLogger().println("Stopping the green app "+greenAppName);
+				client.stopApplication(greenAppName);
+			}
 		}
+		
 				
 		
 	}
@@ -265,16 +272,18 @@ public class CloudFoundryPushPublisher extends Recorder {
 		{
 			return;
 		}
-		try 
-		{
+		try {
 			doRouteRemappingForBlueGreenDeployment(client,
 					deploymentInfo,listener);
-			doAppRenamingForBlueGreenDeployment(client,deploymentInfo,listener);
 		}
-		catch (CloudFoundryException cfe) {
-			cfe.printStackTrace(listener.getLogger());
-			handleFailureForBGDeployment(client, deploymentInfo, listener, "Blue/Green Deployment : Failure in route remapping / renaming of app: "+cfe.getMessage());
+		catch(CloudFoundryException th) {
+			th.printStackTrace(listener.getLogger());
+			listener.getLogger().println("Blue/Green Deployment: Failure in route re-mapping. error: "+th.getMessage());
+			handleFailureForBGDeployment(client, deploymentInfo, listener, "Failure in route re-mapping");
+			throw th;
 		}
+		doAppRenamingForBlueGreenDeployment(client,deploymentInfo,listener);
+		
 		
 	}
 
@@ -296,37 +305,95 @@ public class CloudFoundryPushPublisher extends Recorder {
 		List<String> greenRoutes = new ArrayList<String>(1);
 		listener.getLogger().println("Green Route: "+greenRoute);
 		greenRoutes.add(greenRoute);
+
+		listener.getLogger().println("Adding routes to  " + greenAppName);
+		logRoutes(listener, blueRoutes);
+		addRoutesToApplication(client, greenAppName, blueRoutes, listener);
+
+		listener.getLogger().println("Deleting routes from  " + blueAppName);
+		logRoutes(listener, blueRoutes);
+		deleteRoutesFromApplication(client, blueAppName, blueRoutes, listener);
 		
-		listener.getLogger().println("Adding routes to  "+greenAppName);
-		logRoutes(listener, blueRoutes);
-		addRoutesToApplication(client,greenAppName,blueRoutes,listener);
-		listener.getLogger().println("Deleting routes from  "+blueAppName);
-		logRoutes(listener, blueRoutes);
-		deleteRoutesFromApplication(client,blueAppName,blueRoutes,listener);
-		listener.getLogger().println("Deleting routes from  "+greenAppName);
+		listener.getLogger().println("Deleting routes from  " + greenAppName);
 		logRoutes(listener, greenRoutes);
-		deleteRoutesFromApplication(client,greenAppName,greenRoutes,listener);
-		listener.getLogger().println("Deleting the green route : "+greenRoute);
+		deleteRoutesFromApplication(client, greenAppName, greenRoutes, listener);
+		listener.getLogger().println("Deleting the green route : " + greenRoute);
 		client.deleteRoute(greenHostName, domain);
+		
+	}
+
+	/**
+	 * Checks the routes for the app and restores the default route, appname.domain
+	 * @param client
+	 * @param deploymentInfo
+	 * @param listener
+	 * @param appName
+	 * @return true if app was found and is in started state, false otherwise.
+	 */
+	private boolean checkAndRestoreRoute(CloudFoundryClient client,
+			DeploymentInfo deploymentInfo, BuildListener listener,
+			String appName) {
+		CloudApplication blueApp = getExistingApp(listener, client, appName);
+		if(blueApp == null)
+		{
+			listener.getLogger().println("Cannot find an app with name "+appName);
+			return false;
+		}
+		List<String> currentBlueAppURIs = blueApp.getUris();
+		if(currentBlueAppURIs.isEmpty()) {
+			listener.getLogger().println("Found that blue app routes are empty. Adding the route back.");
+			currentBlueAppURIs.add(appName+"."+deploymentInfo.getDomain());
+			client.updateApplicationUris(appName, currentBlueAppURIs);
+		}
+		return AppState.STARTED == blueApp.getState();
 	}
 	
 	private void doAppRenamingForBlueGreenDeployment(
 			CloudFoundryClient client, DeploymentInfo deploymentInfo, BuildListener listener) {
 		String blueAppName = deploymentInfo.getBlueAppName();
-		String retainedAppName = blueAppName + "_old";
-		if (existingAppHandler.retainOrigApp) {
-			handleAppRetention(client, blueAppName, retainedAppName);
-		} else  {
-			client.deleteApplication(blueAppName);
-		}
+		String greenAppName = deploymentInfo.getAppName();
+		
+		renameOrDeleteBlueApp(client, deploymentInfo, listener, blueAppName);
+
 		// Rename green app to blue app
-		client.rename(deploymentInfo.getAppName(), blueAppName);
+		listener.getLogger().println("Blue/Green deployment : All success till now. Renaming "+greenAppName+" to  "+blueAppName);
+		try {
+			client.rename(greenAppName, blueAppName);
+		}
+		catch (CloudFoundryException th) {
+			th.printStackTrace(listener.getLogger());
+			listener.getLogger().println("Failure in renaming "+greenAppName+" to "+blueAppName+" . error: "+th.getMessage());
+			throw th;
+		}
+		
 	}
 
-	protected void handleAppRetention(CloudFoundryClient client, String blueAppName, String retainedAppName) {
+	private void renameOrDeleteBlueApp(CloudFoundryClient client,
+			DeploymentInfo deploymentInfo, BuildListener listener,
+			String blueAppName) {
+		String retainedAppName = blueAppName + "_old";
+		try {
+			if (existingAppHandler.retainOrigApp) {
+				handleAppRetention(client, blueAppName, retainedAppName, listener);
+			} else  {
+				client.deleteApplication(blueAppName);
+			}
+			
+		}
+		catch (CloudFoundryException th) {
+			th.printStackTrace(listener.getLogger());
+			listener.getLogger().println("Failure in renaming / deleting blue App. error: "+th.getMessage());
+			handleFailureForBGDeployment(client, deploymentInfo, listener, "Failure in renaming / deleting blue App");
+			throw th;
+		}
+	}
+
+	protected void handleAppRetention(CloudFoundryClient client, String blueAppName, String retainedAppName,BuildListener listener) {
 		if (doesAppExist(client, retainedAppName)) {
+			listener.getLogger().println(retainedAppName+"  already exists. Deleting that app.");
 			client.deleteApplication(retainedAppName);
 		}
+		listener.getLogger().println("Renaming "+blueAppName+" to  "+retainedAppName);
 		client.rename(blueAppName, retainedAppName);
 	}
     
