@@ -30,8 +30,7 @@ public class ManifestReaderTest {
         assertEquals("hello-java", result.get("name"));
         assertEquals("512M", result.get("memory"));
         assertEquals("target/hello-java-1.0.war", result.get("path"));
-        //read the default stack
-        assertEquals("cflinuxfs2", result.get("stack"));
+        assertEquals(null, result.get("null"));
     }
     
     @Test
