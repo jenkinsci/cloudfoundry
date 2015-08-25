@@ -30,6 +30,20 @@ public class ManifestReaderTest {
         assertEquals("hello-java", result.get("name"));
         assertEquals("512M", result.get("memory"));
         assertEquals("target/hello-java-1.0.war", result.get("path"));
+        //read the default stack
+        assertEquals("cflinuxfs2", result.get("stack"));
+    }
+    
+    @Test
+    public void testGetApplicationStack() throws Exception {
+        File manifestFile = new File(getClass().getResource("custom-stack-manifest.yml").toURI());
+        FilePath manifestFilePath = new FilePath(manifestFile);
+        ManifestReader reader = new ManifestReader(manifestFilePath);
+        Map<String, Object> result = reader.getApplicationInfo();
+        assertEquals("hello-java", result.get("name"));
+        assertEquals("512M", result.get("memory"));
+        assertEquals("target/hello-java-1.0.war", result.get("path"));
+        assertEquals("customstack", result.get("stack"));
     }
 
     @Test

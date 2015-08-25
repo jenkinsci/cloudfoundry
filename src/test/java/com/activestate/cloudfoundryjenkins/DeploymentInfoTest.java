@@ -79,6 +79,7 @@ public class DeploymentInfoTest {
         assertEquals(DEFAULT_MEMORY, deploymentInfo.getMemory());
         assertEquals("jenkins-build-name", deploymentInfo.getHostname());
         assertEquals(DEFAULT_INSTANCES, deploymentInfo.getInstances());
+        assertEquals(DEFAULT_STACK, deploymentInfo.getStack());
         assertEquals(DEFAULT_TIMEOUT, deploymentInfo.getTimeout());
         assertEquals(false, deploymentInfo.isNoRoute());
         assertEquals("domain-name", deploymentInfo.getDomain());
@@ -160,6 +161,7 @@ public class DeploymentInfoTest {
         assertEquals(DEFAULT_MEMORY, deploymentInfo.getMemory());
         assertEquals("jenkins-build-name", deploymentInfo.getHostname());
         assertEquals(DEFAULT_INSTANCES, deploymentInfo.getInstances());
+        assertEquals(DEFAULT_STACK, deploymentInfo.getStack());
         assertEquals(DEFAULT_TIMEOUT, deploymentInfo.getTimeout());
         assertEquals(false, deploymentInfo.isNoRoute());
         assertEquals("domain-name", deploymentInfo.getDomain());

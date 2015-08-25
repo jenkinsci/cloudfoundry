@@ -39,6 +39,7 @@ public class DeploymentInfo {
     private String buildpack;
     private String command;
     private String domain;
+    private String stack;
 
     private Map<String, String> envVars = new HashMap<String, String>();
     private List<String> servicesNames = new ArrayList<String>();
@@ -129,6 +130,12 @@ public class DeploymentInfo {
             timeout = DescriptorImpl.DEFAULT_TIMEOUT;
         }
         this.timeout = timeout;
+        
+        String stack = (String) manifestJson.get("stack");
+        if (stack == null) {
+        	stack = DescriptorImpl.DEFAULT_STACK;
+        }
+        this.stack = stack;
 
         Boolean noRoute = (Boolean) manifestJson.get("no-route");
         if (noRoute == null) {
@@ -292,6 +299,10 @@ public class DeploymentInfo {
 
     public int getInstances() {
         return instances;
+    }
+    
+    public String getStack() {
+    	return stack;
     }
 
     public int getTimeout() {

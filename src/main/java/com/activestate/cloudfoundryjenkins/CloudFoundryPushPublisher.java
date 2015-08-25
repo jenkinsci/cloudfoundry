@@ -577,6 +577,7 @@ public class CloudFoundryPushPublisher extends Recorder {
         public static final int DEFAULT_MEMORY = 512;
         public static final int DEFAULT_INSTANCES = 1;
         public static final int DEFAULT_TIMEOUT = 60;
+        public static final String DEFAULT_STACK = "cflinuxfs2";
 
         @Override
         public boolean isApplicable(Class<? extends AbstractProject> jobType) {
