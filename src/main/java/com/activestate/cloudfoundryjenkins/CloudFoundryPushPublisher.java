@@ -354,7 +354,7 @@ public class CloudFoundryPushPublisher extends Recorder {
         if (createNewApp) {
             listener.getLogger().println("Creating new app.");
             Staging staging = new Staging(deploymentInfo.getCommand(), deploymentInfo.getBuildpack(),
-                    null, deploymentInfo.getTimeout());
+                    deploymentInfo.getStack(), deploymentInfo.getTimeout());
             List<String> uris = new ArrayList<String>();
             // Pass an empty List as the uri list if no-route is set
             if (!deploymentInfo.isNoRoute()) {
