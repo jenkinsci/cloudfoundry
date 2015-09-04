@@ -8,6 +8,7 @@ applications:
   no-route: true
   domain: testdomain.local
   path: target/hello-java-1.0.war
+  stack: customstack
   buildpack: https://github.com/heroku/heroku-buildpack-hello
   command: echo Hello
   env:
