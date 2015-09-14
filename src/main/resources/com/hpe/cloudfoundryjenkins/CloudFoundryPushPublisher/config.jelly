@@ -17,10 +17,11 @@
   </f:entry>
   <f:validateButton title="Test Connection" progress="Testing..." method="testConnection"
                     with="target,username,password,credentialsId,organization,cloudSpace,selfSigned"/>
-  <f:entry title="Reset app if already exists" field="resetIfExists">
-    <f:checkbox/>
+  <f:entry title="Cutover method" field="cutoverMethod">
+    <f:radioBlock title="Deploy and halt if app already exists" name="cutoverMethod" value="deploy" checked="${instance.cutoverMethod == 'deploy'}" />
+    <f:radioBlock title="Redeploy and reset existing app" name="cutoverMethod" value="redeploy" checked="${instance.cutoverMethod == 'redeploy'}" />
+    <f:radioBlock title="Deploy and reroute to new app (blue/green)" name="cutoverMethod" value="reroute" checked="${instance.cutoverMethod == 'reroute'}" />
   </f:entry>
-
   <f:entry title="Create services before pushing" field="createServices">
     <f:repeatable var="servicesToCreate" items="${instance.servicesToCreate}">
       <table width="100%">
