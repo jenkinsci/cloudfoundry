@@ -81,7 +81,7 @@ public class CloudFoundryPushPublisher extends Recorder {
             this.servicesToCreate = servicesToCreate;
         }
         if (manifestChoice == null) {
-            this.manifestChoice = Manifes	tChoice.defaultManifestFileConfig();
+            this.manifestChoice = ManifestChoice.defaultManifestFileConfig();
         } else {
             this.manifestChoice = manifestChoice;
         }
@@ -382,9 +382,9 @@ public class CloudFoundryPushPublisher extends Recorder {
            int i=0;
            do {
               if(client.getApplication(appTempName).getState() == CloudApplication.AppState.STARTED) {
-                 List<String> rerouteUris = new ArrayList<String>();
-                 rerouteUris.add(appURI);
-                 client.getApplication(appTempName).setUris(rerouteUris);
+                 List<String> uris = new ArrayList<String>();
+                 uris.add(appURI);
+                 client.getApplication(appTempName).setUris(uris);
                  listener.getLogger().println("App rerouted");
                  client.deleteApplication(deploymentInfo.getAppName());
                  listener.getLogger().println("Old app deleted.");
@@ -394,7 +394,7 @@ public class CloudFoundryPushPublisher extends Recorder {
                  Thread.sleep(1000);
                  listener.getLogger().println("App could not be rerouted");
               }
-              i++;
+
            } while(i<10); 
 	}
         return true;
