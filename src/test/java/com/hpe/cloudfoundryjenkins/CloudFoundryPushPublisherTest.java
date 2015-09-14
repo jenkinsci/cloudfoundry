@@ -95,7 +95,7 @@ public class CloudFoundryPushPublisherTest {
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
 
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, null, ManifestChoice.defaultManifestFileConfig());
+                "testCredentialsId", false, "deploy", null, ManifestChoice.defaultManifestFileConfig());
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -126,7 +126,7 @@ public class CloudFoundryPushPublisherTest {
                         "target/hello-java-1.0.war", "", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, null, manifest);
+                "testCredentialsId", false, "deploy", null, manifest);
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -218,7 +218,7 @@ public void testPerformCutoverMethod() throws Exception {
                         "target/hello-java-1.0.war", "", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, null, manifest);
+                "testCredentialsId", false, "deploy", null, manifest);
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -250,7 +250,7 @@ public void testPerformCutoverMethod() throws Exception {
                         "https://github.com/heroku/heroku-buildpack-nodejs", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, null, manifest);
+                "testCredentialsId", false, "deploy", null, manifest);
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -277,7 +277,7 @@ public void testPerformCutoverMethod() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("multi-hello-java.zip")));
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, null, ManifestChoice.defaultManifestFileConfig());
+                "testCredentialsId", false, "deploy", null, ManifestChoice.defaultManifestFileConfig());
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -319,7 +319,7 @@ public void testPerformCutoverMethod() throws Exception {
         ManifestChoice manifestChoice = new ManifestChoice("manifestFile", "manifest/manifest.yml",
                 null, 0, null, 0, 0, false, null, null, null, null, null, null, null);
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, null, manifestChoice);
+                "testCredentialsId", false, "deploy", null, manifestChoice);
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -354,7 +354,7 @@ public void testPerformCutoverMethod() throws Exception {
                         "target/hello-java-1.0.war", "", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, null, manifest);
+                "testCredentialsId", false, "deploy", null, manifest);
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -373,7 +373,7 @@ public void testPerformCutoverMethod() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("python-env.zip")));
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, null, ManifestChoice.defaultManifestFileConfig());
+                "testCredentialsId", false, "deploy", null, ManifestChoice.defaultManifestFileConfig());
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -414,7 +414,7 @@ public void testPerformCutoverMethod() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("python-env-services.zip")));
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, null, ManifestChoice.defaultManifestFileConfig());
+                "testCredentialsId", false, "deploy", null, ManifestChoice.defaultManifestFileConfig());
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -447,7 +447,7 @@ public void testPerformCutoverMethod() throws Exception {
         serviceList.add(mysqlService);
 
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, serviceList, ManifestChoice.defaultManifestFileConfig());
+                "testCredentialsId", false, "deploy", serviceList, ManifestChoice.defaultManifestFileConfig());
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -487,7 +487,7 @@ public void testPerformCutoverMethod() throws Exception {
         serviceList.add(mysqlService);
 
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, serviceList, ManifestChoice.defaultManifestFileConfig());
+                "testCredentialsId", false, "deploy", serviceList, ManifestChoice.defaultManifestFileConfig());
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -519,7 +519,7 @@ public void testPerformCutoverMethod() throws Exception {
                         "target/hello-java-1.0.war", "", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, null, manifest);
+                "testCredentialsId", false, "deploy", null, manifest);
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -543,7 +543,7 @@ public void testPerformCutoverMethod() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher("https://does-not-exist.local",
-                TEST_ORG, TEST_SPACE, "testCredentialsId", false, false, null, null);
+                TEST_ORG, TEST_SPACE, "testCredentialsId", false, "deploy", null, null);
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -565,7 +565,7 @@ public void testPerformCutoverMethod() throws Exception {
                 new UsernamePasswordCredentialsImpl(CredentialsScope.GLOBAL, "wrongCredentialsId", "",
                         "wrongName", "wrongPass"));
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "wrongCredentialsId", false, false, null, ManifestChoice.defaultManifestFileConfig());
+                "wrongCredentialsId", false, "deploy", null, ManifestChoice.defaultManifestFileConfig());
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
