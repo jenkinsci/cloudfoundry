@@ -11,7 +11,6 @@ import com.cloudbees.plugins.credentials.common.StandardUsernameCredentials;
 import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials;
 import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
 import hudson.Extension;
-import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
 import hudson.ProxyConfiguration;
