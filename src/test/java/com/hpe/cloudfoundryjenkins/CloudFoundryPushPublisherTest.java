@@ -121,10 +121,9 @@ public class CloudFoundryPushPublisherTest {
     public void testPerformSimplePushJenkinsConfig() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
-        ManifestChoice manifest =
-                new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 0, 0, false,
-                        "target/hello-java-1.0.war", "", "", "", "", "",
-                        new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
+        ManifestChoice manifest =  new ManifestChoice("jenkinsConfig", null, "hello-java", 512,
+                "", 0, 0, false, "target/hello-java-1.0.war", "", "", "", "", 
+                new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
 
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
                 "testCredentialsId", false, "deploy", null, manifest);
@@ -154,10 +153,9 @@ public class CloudFoundryPushPublisherTest {
 public void testPerformCutoverMethod() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
-        ManifestChoice manifest1 =
-                new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 0, 0, false,
-                        "target/hello-java-1.0.war", "", "", "", "",
-                        new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
+        ManifestChoice manifest1 = new ManifestChoice("jenkinsConfig", null, "hello-java", 512, 
+                "", 0, 0, false, "target/hello-java-1.0.war", "", "", "", "", 
+                new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf1 = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
                 "testCredentialsId", false, "deploy", null, manifest1);
         project.getPublishersList().add(cf1);
@@ -173,10 +171,9 @@ public void testPerformCutoverMethod() throws Exception {
 
         project.getPublishersList().remove(cf1);
 
-        ManifestChoice manifest2 =
-                new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 0, 0, false,
-                        "target/hello-java-1.0.war", "", "", "",
-                        new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
+        ManifestChoice manifest2 = new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 
+                0, 0, false, "target/hello-java-1.0.war", "", "", "", "",
+                new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf2 = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
                 "testCredentialsId", false, "redeploy", null, manifest2);
         project.getPublishersList().add(cf2);
@@ -192,10 +189,9 @@ public void testPerformCutoverMethod() throws Exception {
 
         project.getPublishersList().remove(cf2);
 
-        ManifestChoice manifest3 =
-                new ManifestChoice("jenkinsConfig", null, "hello-java", 256, "", 0, 0, false,
-                        "target/hello-java-1.0.war", "", "", "",
-                        new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
+        ManifestChoice manifest3 = new ManifestChoice("jenkinsConfig", null, "hello-java", 256, "", 
+                0, 0, false, "target/hello-java-1.0.war", "", "", "", "",
+                new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf3 = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
                 "testCredentialsId", false, "reroute", null, manifest3);
         project.getPublishersList().add(cf3);
@@ -214,10 +210,9 @@ public void testPerformCutoverMethod() throws Exception {
     public void testPerformMultipleInstances() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
-        ManifestChoice manifest =
-                new ManifestChoice("jenkinsConfig", null, "hello-java", 64, "", 4, 0, false,
-                        "target/hello-java-1.0.war", "", "", "", "",
-                        new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
+        ManifestChoice manifest = new ManifestChoice("jenkinsConfig", null, "hello-java", 64, 
+                "", 4, 0, false, "target/hello-java-1.0.war", "", "", "", "",
+                new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
                 "testCredentialsId", false, "deploy", null, manifest);
         project.getPublishersList().add(cf);
@@ -246,10 +241,9 @@ public void testPerformCutoverMethod() throws Exception {
     public void testPerformCustomBuildpack() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("heroku-node-js-sample.zip")));
-        ManifestChoice manifest =
-                new ManifestChoice("jenkinsConfig", null, "heroku-node-js-sample", 512, "", 1, 60, false, "",
-                        "https://github.com/heroku/heroku-buildpack-nodejs", "", "", "",
-                        new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
+        ManifestChoice manifest = new ManifestChoice("jenkinsConfig", null, "heroku-node-js-sample", 512,
+                "", 1, 60, false, "", "https://github.com/heroku/heroku-buildpack-nodejs", "", "", "",
+                new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
                 "testCredentialsId", false, "deploy", null, manifest);
         project.getPublishersList().add(cf);
@@ -350,10 +344,9 @@ public void testPerformCutoverMethod() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
 
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
-        ManifestChoice manifest =
-                new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 0, 1, false,
-                        "target/hello-java-1.0.war", "", "", "", "",
-                        new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
+        ManifestChoice manifest = new ManifestChoice("jenkinsConfig", null, "hello-java", 512, 
+                "", 0, 1, false, "target/hello-java-1.0.war", "", "", "", "",
+                new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
                 "testCredentialsId", false, "deploy", null, manifest);
         project.getPublishersList().add(cf);
@@ -515,10 +508,9 @@ public void testPerformCutoverMethod() throws Exception {
     public void testPerformNoRoute() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
-        ManifestChoice manifest =
-                new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 0, 0, true,
-                        "target/hello-java-1.0.war", "", "", "", "",
-                        new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
+        ManifestChoice manifest = new ManifestChoice("jenkinsConfig", null, "hello-java", 512, 
+                "", 0, 0, true, "target/hello-java-1.0.war", "", "", "", "",
+                new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
                 "testCredentialsId", false, "deploy", null, manifest);
         project.getPublishersList().add(cf);
