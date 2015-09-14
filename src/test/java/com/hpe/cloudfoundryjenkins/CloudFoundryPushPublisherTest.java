@@ -123,7 +123,7 @@ public class CloudFoundryPushPublisherTest {
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
         ManifestChoice manifest =
                 new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 0, 0, false,
-                        "target/hello-java-1.0.war", "", "", "", "",
+                        "target/hello-java-1.0.war", "", "", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
 
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
@@ -183,7 +183,7 @@ public void testPerformCutoverMethod() throws Exception {
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " cutover restage method completed");
 
-        String log = FileUtils.readFileToString(build.getLogFile());
+        log = FileUtils.readFileToString(build.getLogFile());
         System.out.println(log);
 
         assertTrue("Build 2 did not succeed", build.getResult().isBetterOrEqualTo(Result.SUCCESS));
