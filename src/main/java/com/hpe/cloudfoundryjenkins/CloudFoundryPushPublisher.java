@@ -352,12 +352,12 @@ public class CloudFoundryPushPublisher extends Recorder {
               // Alter app name and set temporary route to new app (blue/green)
               listener.getLogger().println("App already exists, redeploying blue/green");
               if (appTempName.endsWith("-green")) {
-                 appTempName = appTempName.replace("-blue","-green");
-                 appTempURI = appTempURI.replace("-blue","-green");
-              }
-              else if (appTempName.endsWith("-blue")) {
                  appTempName = appTempName.replace("-green","-blue");
                  appTempURI = appTempURI.replace("-green","-blue");
+              }
+              else if (appTempName.endsWith("-blue")) {
+                 appTempName = appTempName.replace("-blue","-green");
+                 appTempURI = appTempURI.replace("-blue","-green");
               }
               else {
                  appTempName += "-green";
