@@ -1,4 +1,4 @@
-/**
+f/**
  * Copyright (c) ActiveState 2014 - ALL RIGHTS RESERVED.
  */
 
@@ -80,7 +80,7 @@ public class CloudFoundryPushPublisher extends Recorder {
             this.servicesToCreate = servicesToCreate;
         }
         if (manifestChoice == null) {
-            this.manifestChoice = Manifes	tChoice.defaultManifestFileConfig();
+            this.manifestChoice = ManifestChoice.defaultManifestFileConfig();
         } else {
             this.manifestChoice = manifestChoice;
         }
