@@ -177,7 +177,7 @@ public void testPerformCutoverMethod() throws Exception {
         CloudFoundryPushPublisher cf2 = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
                 "testCredentialsId", false, "redeploy", null, manifest2);
         project.getPublishersList().add(cf2);
-        FreeStyleBuild build = project.scheduleBuild2(0).get();
+        build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " cutover restage method completed");
 
         log = FileUtils.readFileToString(build.getLogFile());
