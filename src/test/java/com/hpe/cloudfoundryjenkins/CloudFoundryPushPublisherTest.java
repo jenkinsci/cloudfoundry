@@ -158,7 +158,7 @@ public void testPerformCutoverMethod() throws Exception {
                         "target/hello-java-1.0.war", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf1 = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, "stage", null, manifest1);
+                "testCredentialsId", false, "deploy", null, manifest1);
         project.getPublishersList().add(cf1);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " cutover stage method completed");
@@ -177,7 +177,7 @@ public void testPerformCutoverMethod() throws Exception {
                         "target/hello-java-1.0.war", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf2 = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, "restage", null, manifest2);
+                "testCredentialsId", false, "redeploy", null, manifest2);
         project.getPublishersList().add(cf2);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " cutover restage method completed");

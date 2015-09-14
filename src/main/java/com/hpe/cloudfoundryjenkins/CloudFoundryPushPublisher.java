@@ -343,32 +343,30 @@ public class CloudFoundryPushPublisher extends Recorder {
         String appTempURI = appURI;
 
         if (cloudApplication != null) {
-           switch (cutoverMethod.toLowerCase()) {
-              case "redeploy":
+           if (cutoverMethod.equals("redeploy")) {
                  listener.getLogger().println("App already exists, redeploying.");
                  client.deleteApplication(deploymentInfo.getAppName());
                  listener.getLogger().println("App deleted.");
-              break;
-              case "reroute":
-                 // Alter app name and set temporary route to new app (blue/green)
-                 listener.getLogger().println("App already exists, redeploying blue/green");
-                 if (appTempName.endsWith("-green")) {
-                    appTempName = appTempName.replace("-blue","-green");
-                    appTempURI = appTempURI.replace("-blue","-green");
-                 }
-                 else if (appTempName.endsWith("-blue")) {
-                    appTempName = appTempName.replace("-green","-blue");
-                    appTempURI = appTempURI.replace("-green","-blue");
-                 }
-                 else {
-                    appTempName += "-green";
-                    appTempURI += "-green";
-                 }
-              break;
-              default:
-                 listener.getLogger().println("App already exists, skipping creation.");
-                 return false;
-              break;
+           }
+           else if (cutoverMethod.equals("reroute")) {
+              // Alter app name and set temporary route to new app (blue/green)
+              listener.getLogger().println("App already exists, redeploying blue/green");
+              if (appTempName.endsWith("-green")) {
+                 appTempName = appTempName.replace("-blue","-green");
+                 appTempURI = appTempURI.replace("-blue","-green");
+              }
+              else if (appTempName.endsWith("-blue")) {
+                 appTempName = appTempName.replace("-green","-blue");
+                 appTempURI = appTempURI.replace("-green","-blue");
+              }
+              else {
+                 appTempName += "-green";
+                 appTempURI += "-green";
+              }
+           }
+           else {
+              listener.getLogger().println("App already exists, skipping creation.");
+              return false;
            }
         }
 
