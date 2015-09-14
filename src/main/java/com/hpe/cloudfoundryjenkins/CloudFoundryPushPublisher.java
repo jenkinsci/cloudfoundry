@@ -396,8 +396,14 @@ public class CloudFoundryPushPublisher extends Recorder {
                  break;
               }
               else {
-                 Thread.sleep(1000);
-                 listener.getLogger().println("App could not be rerouted");
+                 try {
+                    Thread.sleep(1000);
+                    listener.getLogger().println("App could not be rerouted");
+                 } 
+                 catch(InterruptedException e) {
+                    listener.getLogger().println("ERROR: InterruptedException: " + e.getMessage());
+                    return false;
+                 }
               }
               i++;
            } while(i<10); 
