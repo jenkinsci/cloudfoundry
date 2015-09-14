@@ -150,18 +150,18 @@ public class CloudFoundryPushPublisherTest {
 
     @Test
     @WithTimeout(300)
-    public void testPerformResetIfExists() throws Exception {
+public void testPerformCutoverMethod() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
         ManifestChoice manifest1 =
                 new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 0, 0, false,
-                        "target/hello-java-1.0.war", "", "", "", "",
+                        "target/hello-java-1.0.war", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf1 = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, true, null, manifest1);
+                "testCredentialsId", false, "stage", null, manifest1);
         project.getPublishersList().add(cf1);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
-        System.out.println(build.getDisplayName() + " 1 completed");
+        System.out.println(build.getDisplayName() + " cutover stage method completed");
 
         String log = FileUtils.readFileToString(build.getLogFile());
         System.out.println(log);
@@ -173,19 +173,39 @@ public class CloudFoundryPushPublisherTest {
         project.getPublishersList().remove(cf1);
 
         ManifestChoice manifest2 =
-                new ManifestChoice("jenkinsConfig", null, "hello-java", 256, "", 0, 0, false,
-                        "target/hello-java-1.0.war", "", "", "", "",
+                new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 0, 0, false,
+                        "target/hello-java-1.0.war", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf2 = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, true, null, manifest2);
+                "testCredentialsId", false, "restage", null, manifest2);
         project.getPublishersList().add(cf2);
-        build = project.scheduleBuild2(0).get();
+        FreeStyleBuild build = project.scheduleBuild2(0).get();
+        System.out.println(build.getDisplayName() + " cutover restage method completed");
 
-        log = FileUtils.readFileToString(build.getLogFile());
+        String log = FileUtils.readFileToString(build.getLogFile());
         System.out.println(log);
 
         assertTrue("Build 2 did not succeed", build.getResult().isBetterOrEqualTo(Result.SUCCESS));
         assertTrue("Build 2 did not display staging logs", log.contains("Downloaded app package"));
+        assertEquals(512, client.getApplication("hello-java").getMemory());
+
+        project.getPublishersList().remove(cf2);
+
+        ManifestChoice manifest3 =
+                new ManifestChoice("jenkinsConfig", null, "hello-java", 256, "", 0, 0, false,
+                        "target/hello-java-1.0.war", "", "", "",
+                        new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
+        CloudFoundryPushPublisher cf3 = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
+                "testCredentialsId", false, "reroute", null, manifest3);
+        project.getPublishersList().add(cf3);
+        build = project.scheduleBuild2(0).get();
+        System.out.println(build.getDisplayName() + " cutover reroute method completed");
+
+        log = FileUtils.readFileToString(build.getLogFile());
+        System.out.println(log);
+
+        assertTrue("Build 3 did not succeed", build.getResult().isBetterOrEqualTo(Result.SUCCESS));
+        assertTrue("Build 3 did not display staging logs", log.contains("Downloaded app package"));
         assertEquals(256, client.getApplication("hello-java").getMemory());
     }
 

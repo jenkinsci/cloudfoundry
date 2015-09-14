@@ -55,7 +55,7 @@ public class CloudFoundryPushPublisher extends Recorder {
     public String cloudSpace;
     public String credentialsId;
     public boolean selfSigned;
-    public boolean resetIfExists;
+    public String cutoverMethod;
     public List<Service> servicesToCreate;
     public ManifestChoice manifestChoice;
 
@@ -67,14 +67,14 @@ public class CloudFoundryPushPublisher extends Recorder {
     @DataBoundConstructor
     public CloudFoundryPushPublisher(String target, String organization, String cloudSpace,
                                      String credentialsId, boolean selfSigned,
-                                     boolean resetIfExists, List<Service> servicesToCreate,
+                                     String cutoverMethod, List<Service> servicesToCreate,
                                      ManifestChoice manifestChoice) {
         this.target = target;
         this.organization = organization;
         this.cloudSpace = cloudSpace;
         this.credentialsId = credentialsId;
         this.selfSigned = selfSigned;
-        this.resetIfExists = resetIfExists;
+        this.cutoverMethod = cutoverMethod;
         if (servicesToCreate == null) {
             this.servicesToCreate = new ArrayList<Service>();
         } else {
@@ -337,42 +337,74 @@ public class CloudFoundryPushPublisher extends Recorder {
 
     private boolean createApplicationIfNeeded(CloudFoundryClient client, BuildListener listener,
                                               DeploymentInfo deploymentInfo, String appURI) {
-        // Check if app already exists
-        List<CloudApplication> existingApps = client.getApplications();
-        boolean createNewApp = true;
-        for (CloudApplication app : existingApps) {
-            if (app.getName().equals(deploymentInfo.getAppName())) {
-                if (resetIfExists) {
-                    listener.getLogger().println("App already exists, resetting.");
-                    client.deleteApplication(deploymentInfo.getAppName());
-                    listener.getLogger().println("App deleted.");
-                } else {
-                    createNewApp = false;
-                    listener.getLogger().println("App already exists, skipping creation.");
-                }
-                break;
-            }
+        // Get app instance
+        CloudApplication cloudApplication = client.getApplication(deploymentInfo.getAppName());
+        String appTempName = deploymentInfo.getAppName();
+        String appTempURI = appURI;
+
+        if (cloudApplication != null) {
+           switch (cutoverMethod.toLowerCase()) {
+              case "redeploy":
+                 listener.getLogger().println("App already exists, redeploying.");
+                 client.deleteApplication(deploymentInfo.getAppName());
+                 listener.getLogger().println("App deleted.");
+              break;
+              case "reroute":
+                 // Alter app name and set temporary route to new app (blue/green)
+                 listener.getLogger().println("App already exists, redeploying blue/green");
+                 if (appTempName.endsWith("-green")) {
+                    appTempName = appTempName.replace("-blue","-green");
+                    appTempURI = appTempURI.replace("-blue","-green");
+                 }
+                 else if (appTempName.endsWith("-blue")) {
+                    appTempName = appTempName.replace("-green","-blue");
+                    appTempURI = appTempURI.replace("-green","-blue");
+                 }
+                 else {
+                    appTempName += "-green";
+                    appTempURI += "-green";
+                 }
+              break;
+              default:
+                 listener.getLogger().println("App already exists, skipping creation.");
+                 return false;
+              break;
+           }
         }
 
-        // Create app if it doesn't exist
-        if (createNewApp) {
-            listener.getLogger().println("Creating new app.");
-            String stack = deploymentInfo.getStack();
-            if (client.getStack(stack) == null) {
-                throw new IllegalArgumentException("Stack " + stack + " does not exist on the target.");
-            }
-            Staging staging = new Staging(deploymentInfo.getCommand(), deploymentInfo.getBuildpack(),
-                    deploymentInfo.getStack(), deploymentInfo.getTimeout());
-            List<String> uris = new ArrayList<String>();
-            // Pass an empty List as the uri list if no-route is set
-            if (!deploymentInfo.isNoRoute()) {
-                uris.add(appURI);
-            }
-            List<String> services = deploymentInfo.getServicesNames();
-            client.createApplication(deploymentInfo.getAppName(), staging, deploymentInfo.getMemory(), uris, services);
+        // Create new app
+        Staging staging = new Staging(deploymentInfo.getCommand(), deploymentInfo.getBuildpack(),
+              null, deploymentInfo.getTimeout());
+        List<String> uris = new ArrayList<String>();
+        // Pass an empty List as the uri list if no-route is set
+        if (!deploymentInfo.isNoRoute()) {
+           uris.add(appTempURI);
         }
+        List<String> services = deploymentInfo.getServicesNames();
+        client.createApplication(appTempName, staging, deploymentInfo.getMemory(), uris, services);
+        listener.getLogger().println("App deployed");
 
-        return createNewApp;
+        // Reroute new app and delete old one if blue/green rerouting selected
+        if(!appURI.equals(appTempURI)) {
+           int i=0;
+           do {
+              if(client.getApplication(appTempName).getState() == CloudApplication.AppState.STARTED) {
+                 List<String> rerouteUris = new ArrayList<String>();
+                 rerouteUris.add(appURI);
+                 client.getApplication(appTempName).setUris(rerouteUris);
+                 listener.getLogger().println("App rerouted");
+                 client.deleteApplication(deploymentInfo.getAppName());
+                 listener.getLogger().println("Old app deleted.");
+                 break;
+              }
+              else {
+                 Thread.sleep(1000);
+                 listener.getLogger().println("App could not be rerouted");
+              }
+              i++;
+           } while(i<10); 
+        }
+        return true;
     }
 
     private void pushAppBits(AbstractBuild build, BuildListener listener, DeploymentInfo deploymentInfo,
