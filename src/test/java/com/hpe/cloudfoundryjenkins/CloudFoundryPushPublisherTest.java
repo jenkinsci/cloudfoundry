@@ -125,6 +125,7 @@ public class CloudFoundryPushPublisherTest {
                 new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 0, 0, false,
                         "target/hello-java-1.0.war", "", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
+
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
                 "testCredentialsId", false, "deploy", null, manifest);
         project.getPublishersList().add(cf);
@@ -155,7 +156,7 @@ public void testPerformCutoverMethod() throws Exception {
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
         ManifestChoice manifest1 =
                 new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 0, 0, false,
-                        "target/hello-java-1.0.war", "", "", "",
+                        "target/hello-java-1.0.war", "", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf1 = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
                 "testCredentialsId", false, "deploy", null, manifest1);

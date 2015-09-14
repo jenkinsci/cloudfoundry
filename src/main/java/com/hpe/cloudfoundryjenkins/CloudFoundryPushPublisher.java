@@ -236,7 +236,7 @@ public class CloudFoundryPushPublisher extends Recorder {
 
             listener.getLogger().println("Pushing " + appName + " app to " + target);
 
-            // Create app if it doesn't already exist, or if resetIfExists parameter is true
+            // Create app if it doesn't already exist depending on cutoverMethod parameter
             boolean createdNewApp = createApplicationIfNeeded(client, listener, deploymentInfo, appURI);
 
             // Unbind all routes if no-route parameter is set
