@@ -11,6 +11,7 @@ import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
 import com.cloudbees.plugins.credentials.common.StandardUsernameCredentials;
 import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials;
 import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
+
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
@@ -27,6 +28,7 @@ import hudson.util.Secret;
 import jenkins.model.Jenkins;
 import net.lingala.zip4j.core.ZipFile;
 import net.lingala.zip4j.exception.ZipException;
+
 import org.apache.tomcat.util.http.fileupload.FileUtils;
 import org.cloudfoundry.client.lib.*;
 import org.cloudfoundry.client.lib.domain.*;
@@ -37,11 +39,15 @@ import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 
 import javax.net.ssl.SSLPeerUnverifiedException;
+
 import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -247,7 +253,11 @@ public class CloudFoundryPushPublisher extends Recorder {
 
             // Add environment variables
             if (!deploymentInfo.getEnvVars().isEmpty()) {
-                client.updateApplicationEnv(appName, deploymentInfo.getEnvVars());
+                Map<String, Object> appEnv = client.getApplicationEnvironment(appName);
+                Map<String,String> env = new HashMap<String, String>();
+                env.putAll((Map<String, String>) appEnv.get("environment_json"));
+                env.putAll(deploymentInfo.getEnvVars());
+                client.updateApplicationEnv(appName, env);
             }
 
             // Change number of instances
