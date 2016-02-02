@@ -32,6 +32,7 @@ import org.cloudfoundry.client.lib.*;
 import org.cloudfoundry.client.lib.domain.*;
 import org.cloudfoundry.client.lib.org.springframework.web.client.ResourceAccessException;
 import org.jenkinsci.plugins.tokenmacro.MacroEvaluationException;
+import org.jenkinsci.plugins.tokenmacro.TokenMacro;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
@@ -108,7 +109,7 @@ public class CloudFoundryPushPublisher extends Recorder {
 
         try {
             String jenkinsBuildName = build.getProject().getDisplayName();
-            URL targetUrl = new URL(target);
+            URL targetUrl = new URL(TokenMacro.expandAll(build, listener, target));
 
             List<StandardUsernamePasswordCredentials> standardCredentials = CredentialsProvider.lookupCredentials(
                     StandardUsernamePasswordCredentials.class,
@@ -128,8 +129,13 @@ public class CloudFoundryPushPublisher extends Recorder {
                     new CloudCredentials(credentials.getUsername(), Secret.toString(credentials.getPassword()));
             HttpProxyConfiguration proxyConfig = buildProxyConfiguration(targetUrl);
 
-            CloudFoundryClient client = new CloudFoundryClient(cloudCredentials, targetUrl, organization, cloudSpace,
-                    proxyConfig, selfSigned);
+            CloudFoundryClient client = new CloudFoundryClient(
+              cloudCredentials,
+              targetUrl,
+              TokenMacro.expandAll(build, listener, organization),
+              TokenMacro.expandAll(build, listener, cloudSpace),
+              proxyConfig, selfSigned
+            );
             client.login();
 
             String domain = client.getDefaultDomain().getName();
@@ -167,8 +173,10 @@ public class CloudFoundryPushPublisher extends Recorder {
             // Get all deployment info
             List<DeploymentInfo> allDeploymentInfo = new ArrayList<DeploymentInfo>();
             if (manifestChoice.value.equals("manifestFile")) {
+                //interpret variables in file path
+                String manifest = TokenMacro.expandAll(build, listener, manifestChoice.manifestFile);
                 // Read manifest file
-                FilePath manifestFilePath = new FilePath(build.getWorkspace(), manifestChoice.manifestFile);
+                FilePath manifestFilePath = new FilePath(build.getWorkspace(), manifest);
                 ManifestReader manifestReader = new ManifestReader(manifestFilePath);
                 List<Map<String, Object>> appList = manifestReader.getApplicationList();
                 for (Map<String, Object> appInfo : appList) {
