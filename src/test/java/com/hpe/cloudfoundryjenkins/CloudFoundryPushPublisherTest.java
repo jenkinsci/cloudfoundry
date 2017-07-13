@@ -20,7 +20,6 @@ import hudson.model.FreeStyleProject;
 import hudson.model.Result;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpResponse;
-import org.apache.http.client.fluent.Request;
 import org.apache.http.util.EntityUtils;
 import org.cloudfoundry.client.CloudFoundryClient;
 import org.junit.Before;
@@ -32,10 +31,19 @@ import org.jvnet.hudson.test.recipes.WithTimeout;
 
 import java.io.IOException;
 import java.net.URL;
+import java.security.KeyManagementException;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+import org.apache.http.conn.ssl.TrustSelfSignedStrategy;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.ssl.SSLContextBuilder;
 import org.cloudfoundry.client.v2.applications.DeleteApplicationRequest;
 import org.cloudfoundry.client.v2.serviceinstances.DeleteServiceInstanceRequest;
 import org.cloudfoundry.doppler.DopplerClient;
@@ -71,6 +79,8 @@ public class CloudFoundryPushPublisherTest {
     private static CloudFoundryClient client;
 
     private static CloudFoundryOperations cloudFoundryOperations;
+
+    private static HttpClient httpClient;
 
     @ClassRule
     public static JenkinsRule j = new JenkinsRule();
@@ -145,6 +155,16 @@ public class CloudFoundryPushPublisherTest {
             .build();
     }
 
+    @BeforeClass
+    public static void setupHttpClient() throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
+      SSLContextBuilder builder = new SSLContextBuilder();
+      builder.loadTrustMaterial(null, new TrustSelfSignedStrategy());
+      SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(
+              builder.build());
+
+      httpClient = HttpClients.custom().setSSLSocketFactory(sslsf).build();
+    }
+
     @Before
     public void cleanCloudSpace() throws IOException {
         cloudFoundryOperations.applications()
@@ -171,7 +191,7 @@ public class CloudFoundryPushPublisherTest {
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
 
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, 0, null, ManifestChoice.defaultManifestFileConfig());
+                "testCredentialsId", true, false, 0, null, ManifestChoice.defaultManifestFileConfig());
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -184,8 +204,7 @@ public class CloudFoundryPushPublisherTest {
 
         System.out.println("App URI : " + cf.getAppURIs().get(0));
         String uri = cf.getAppURIs().get(0);
-        Request request = Request.Get(uri);
-        HttpResponse response = request.execute().returnResponse();
+        HttpResponse response = httpClient.execute(new HttpGet(uri));
         int statusCode = response.getStatusLine().getStatusCode();
         assertEquals("Get request did not respond 200 OK", 200, statusCode);
         String content = EntityUtils.toString(response.getEntity());
@@ -202,7 +221,7 @@ public class CloudFoundryPushPublisherTest {
                         "target/hello-java-1.0.war", "", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, 0, null, manifest);
+                "testCredentialsId", true, false, 0, null, manifest);
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -215,8 +234,7 @@ public class CloudFoundryPushPublisherTest {
 
         System.out.println("App URI : " + cf.getAppURIs().get(0));
         String uri = cf.getAppURIs().get(0);
-        Request request = Request.Get(uri);
-        HttpResponse response = request.execute().returnResponse();
+        HttpResponse response = httpClient.execute(new HttpGet(uri));
         int statusCode = response.getStatusLine().getStatusCode();
         assertEquals("Get request did not respond 200 OK", 200, statusCode);
         String content = EntityUtils.toString(response.getEntity());
@@ -234,7 +252,7 @@ public class CloudFoundryPushPublisherTest {
                         "target/hello-java-1.0.war", "", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf1 = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, true, 0, null, manifest1);
+                "testCredentialsId", true, true, 0, null, manifest1);
         project.getPublishersList().add(cf1);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " 1 completed");
@@ -253,7 +271,7 @@ public class CloudFoundryPushPublisherTest {
                         "target/hello-java-1.0.war", "", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf2 = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, true, 0, null, manifest2);
+                "testCredentialsId", true, true, 0, null, manifest2);
         project.getPublishersList().add(cf2);
         build = project.scheduleBuild2(0).get();
 
@@ -274,7 +292,7 @@ public class CloudFoundryPushPublisherTest {
                         "target/hello-java-1.0.war", "", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, 0, null, manifest);
+                "testCredentialsId", true, false, 0, null, manifest);
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -288,8 +306,7 @@ public class CloudFoundryPushPublisherTest {
 
         System.out.println("App URI : " + cf.getAppURIs().get(0));
         String uri = cf.getAppURIs().get(0);
-        Request request = Request.Get(uri);
-        HttpResponse response = request.execute().returnResponse();
+        HttpResponse response = httpClient.execute(new HttpGet(uri));
         int statusCode = response.getStatusLine().getStatusCode();
         assertEquals("Get request did not respond 200 OK", 200, statusCode);
         String content = EntityUtils.toString(response.getEntity());
@@ -306,7 +323,7 @@ public class CloudFoundryPushPublisherTest {
                         "https://github.com/heroku/heroku-buildpack-nodejs", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, 0, null, manifest);
+                "testCredentialsId", true, false, 0, null, manifest);
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -319,8 +336,7 @@ public class CloudFoundryPushPublisherTest {
 
         System.out.println("App URI : " + cf.getAppURIs().get(0));
         String uri = cf.getAppURIs().get(0);
-        Request request = Request.Get(uri);
-        HttpResponse response = request.execute().returnResponse();
+        HttpResponse response = httpClient.execute(new HttpGet(uri));
         int statusCode = response.getStatusLine().getStatusCode();
         assertEquals("Get request did not respond 200 OK", 200, statusCode);
         String content = EntityUtils.toString(response.getEntity());
@@ -333,7 +349,7 @@ public class CloudFoundryPushPublisherTest {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("multi-hello-java.zip")));
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, 0, null, ManifestChoice.defaultManifestFileConfig());
+                "testCredentialsId", true, false, 0, null, ManifestChoice.defaultManifestFileConfig());
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -348,8 +364,7 @@ public class CloudFoundryPushPublisherTest {
         System.out.println("App URIs : " + appUris);
 
         String uri1 = appUris.get(0);
-        Request request1 = Request.Get(uri1);
-        HttpResponse response1 = request1.execute().returnResponse();
+        HttpResponse response1 = httpClient.execute(new HttpGet(uri1));
         int statusCode1 = response1.getStatusLine().getStatusCode();
         assertEquals("Get request for hello-java-1 did not respond 200 OK", 200, statusCode1);
         String content1 = EntityUtils.toString(response1.getEntity());
@@ -357,8 +372,7 @@ public class CloudFoundryPushPublisherTest {
         assertTrue("hello-java-1 did not send back correct text", content1.contains("Hello from"));
         assertEquals((long) 200, (long) cloudFoundryOperations.applications().get(GetApplicationRequest.builder().name("hello-java-1").build()).block().getMemoryLimit());
         String uri2 = appUris.get(1);
-        Request request2 = Request.Get(uri2);
-        HttpResponse response2 = request2.execute().returnResponse();
+        HttpResponse response2 = httpClient.execute(new HttpGet(uri2));
         int statusCode2 = response2.getStatusLine().getStatusCode();
         assertEquals("Get request for hello-java-2 did not respond 200 OK", 200, statusCode2);
         String content2 = EntityUtils.toString(response2.getEntity());
@@ -375,7 +389,7 @@ public class CloudFoundryPushPublisherTest {
         ManifestChoice manifestChoice = new ManifestChoice("manifestFile", "manifest/manifest.yml",
                 null, 0, null, 0, 0, false, null, null, null, null, null, null, null);
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, 0, null, manifestChoice);
+                "testCredentialsId", true, false, 0, null, manifestChoice);
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -388,8 +402,7 @@ public class CloudFoundryPushPublisherTest {
 
         System.out.println("App URI : " + cf.getAppURIs().get(0));
         String uri = cf.getAppURIs().get(0);
-        Request request = Request.Get(uri);
-        HttpResponse response = request.execute().returnResponse();
+        HttpResponse response = httpClient.execute(new HttpGet(uri));
         int statusCode = response.getStatusLine().getStatusCode();
         assertEquals("Get request did not respond 200 OK", 200, statusCode);
         String content = EntityUtils.toString(response.getEntity());
@@ -410,7 +423,7 @@ public class CloudFoundryPushPublisherTest {
                         "target/hello-java-1.0.war", "", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, 0, null, manifest);
+                "testCredentialsId", true, false, 0, null, manifest);
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -429,7 +442,7 @@ public class CloudFoundryPushPublisherTest {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("python-env.zip")));
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, 0, null, ManifestChoice.defaultManifestFileConfig());
+                "testCredentialsId", true, false, 0, null, ManifestChoice.defaultManifestFileConfig());
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -442,8 +455,7 @@ public class CloudFoundryPushPublisherTest {
 
         System.out.println("App URI : " + cf.getAppURIs().get(0));
         String uri = cf.getAppURIs().get(0);
-        Request request = Request.Get(uri);
-        HttpResponse response = request.execute().returnResponse();
+        HttpResponse response = httpClient.execute(new HttpGet(uri));
         int statusCode = response.getStatusLine().getStatusCode();
         assertEquals("Get request did not respond 200 OK", 200, statusCode);
         String content = EntityUtils.toString(response.getEntity());
@@ -470,7 +482,7 @@ public class CloudFoundryPushPublisherTest {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("python-env-services.zip")));
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, 0, null, ManifestChoice.defaultManifestFileConfig());
+                "testCredentialsId", true, false, 0, null, ManifestChoice.defaultManifestFileConfig());
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -483,8 +495,7 @@ public class CloudFoundryPushPublisherTest {
 
         System.out.println("App URI : " + cf.getAppURIs().get(0));
         String uri = cf.getAppURIs().get(0);
-        Request request = Request.Get(uri);
-        HttpResponse response = request.execute().returnResponse();
+        HttpResponse response = httpClient.execute(new HttpGet(uri));
         int statusCode = response.getStatusLine().getStatusCode();
         assertEquals("Get request did not respond 200 OK", 200, statusCode);
         String content = EntityUtils.toString(response.getEntity());
@@ -503,7 +514,7 @@ public class CloudFoundryPushPublisherTest {
         serviceList.add(mysqlService);
 
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, 0, serviceList, ManifestChoice.defaultManifestFileConfig());
+                "testCredentialsId", true, false, 0, serviceList, ManifestChoice.defaultManifestFileConfig());
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -516,8 +527,7 @@ public class CloudFoundryPushPublisherTest {
 
         System.out.println("App URI : " + cf.getAppURIs().get(0));
         String uri = cf.getAppURIs().get(0);
-        Request request = Request.Get(uri);
-        HttpResponse response = request.execute().returnResponse();
+        HttpResponse response = httpClient.execute(new HttpGet(uri));
         int statusCode = response.getStatusLine().getStatusCode();
         assertEquals("Get request did not respond 200 OK", 200, statusCode);
         String content = EntityUtils.toString(response.getEntity());
@@ -543,7 +553,7 @@ public class CloudFoundryPushPublisherTest {
         serviceList.add(mysqlService);
 
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, 0, serviceList, ManifestChoice.defaultManifestFileConfig());
+                "testCredentialsId", true, false, 0, serviceList, ManifestChoice.defaultManifestFileConfig());
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -556,8 +566,7 @@ public class CloudFoundryPushPublisherTest {
 
         System.out.println("App URI : " + cf.getAppURIs().get(0));
         String uri = cf.getAppURIs().get(0);
-        Request request = Request.Get(uri);
-        HttpResponse response = request.execute().returnResponse();
+        HttpResponse response = httpClient.execute(new HttpGet(uri));
         int statusCode = response.getStatusLine().getStatusCode();
         assertEquals("Get request did not respond 200 OK", 200, statusCode);
         String content = EntityUtils.toString(response.getEntity());
@@ -575,7 +584,7 @@ public class CloudFoundryPushPublisherTest {
                         "target/hello-java-1.0.war", "", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "testCredentialsId", false, false, 0, null, manifest);
+                "testCredentialsId", true, false, 0, null, manifest);
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -588,8 +597,7 @@ public class CloudFoundryPushPublisherTest {
 
         System.out.println("App URI : " + cf.getAppURIs().get(0));
         String uri = cf.getAppURIs().get(0);
-        Request request = Request.Get(uri);
-        HttpResponse response = request.execute().returnResponse();
+        HttpResponse response = httpClient.execute(new HttpGet(uri));
         int statusCode = response.getStatusLine().getStatusCode();
         assertEquals("Get request did not respond 404 Not Found", 404, statusCode);
     }
@@ -599,7 +607,7 @@ public class CloudFoundryPushPublisherTest {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java.zip")));
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher("https://does-not-exist.local",
-                TEST_ORG, TEST_SPACE, "testCredentialsId", false, false, 0, null, null);
+                TEST_ORG, TEST_SPACE, "testCredentialsId", true, false, 0, null, null);
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
@@ -621,7 +629,7 @@ public class CloudFoundryPushPublisherTest {
                 new UsernamePasswordCredentialsImpl(CredentialsScope.GLOBAL, "wrongCredentialsId", "",
                         "wrongName", "wrongPass"));
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
-                "wrongCredentialsId", false, false, 0, null, ManifestChoice.defaultManifestFileConfig());
+                "wrongCredentialsId", true, false, 0, null, ManifestChoice.defaultManifestFileConfig());
         project.getPublishersList().add(cf);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
         System.out.println(build.getDisplayName() + " completed");
