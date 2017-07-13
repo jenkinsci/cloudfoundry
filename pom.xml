@@ -43,6 +43,23 @@
     <maven.compiler.target>1.8</maven.compiler.target>
     <maven.compiler.source>1.8</maven.compiler.source>
     <cloudfoundry.client.version>2.15.0.RELEASE</cloudfoundry.client.version>
+
+    <!--
+      The properties below are passed into the test execution as system
+      properties. Default values are specified here, corresponding to the
+      out-of-the-box values for PCF Dev.
+
+      They can be overridden via system properties in MAVEN_OPTS,
+      e.g. MAVEN_OPTS="-Dcloudfoundry.target=..."
+    -->
+    <cloudfoundry.target>api.local.pcfdev.io</cloudfoundry.target>
+    <cloudfoundry.username>user</cloudfoundry.username>
+    <cloudfoundry.password>pass</cloudfoundry.password>
+    <cloudfoundry.org>pcfdev-org</cloudfoundry.org>
+    <cloudfoundry.space>pcfdev-space</cloudfoundry.space>
+    <cloudfoundry.mysqlServiceType>p-mysql</cloudfoundry.mysqlServiceType>
+    <cloudfoundry.nonmysqlServiceType>local-volume</cloudfoundry.nonmysqlServiceType>
+    <cloudfoundry.servicePlan>512mb</cloudfoundry.servicePlan>
   </properties>
 
   <dependencies>
@@ -151,5 +168,26 @@
       <url>http://repo.jenkins-ci.org/public/</url>
     </pluginRepository>
   </pluginRepositories>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <systemPropertyVariables>
+            <target>${cloudfoundry.target}</target>
+            <username>${cloudfoundry.username}</username>
+            <password>${cloudfoundry.password}</password>
+            <org>${cloudfoundry.org}</org>
+            <space>${cloudfoundry.space}</space>
+            <mysqlServiceType>${cloudfoundry.mysqlServiceType}</mysqlServiceType>
+            <nonmysqlServiceType>${cloudfoundry.nonmysqlServiceType}</nonmysqlServiceType>
+            <servicePlan>${cloudfoundry.servicePlan}</servicePlan>
+          </systemPropertyVariables>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 
 </project>
