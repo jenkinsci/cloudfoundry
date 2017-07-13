@@ -14,6 +14,7 @@ import com.cloudbees.plugins.credentials.CredentialsScope;
 import com.cloudbees.plugins.credentials.CredentialsStore;
 import com.cloudbees.plugins.credentials.domains.Domain;
 import com.cloudbees.plugins.credentials.impl.UsernamePasswordCredentialsImpl;
+import hudson.ProxyConfiguration;
 import hudson.model.FreeStyleBuild;
 import hudson.model.FreeStyleProject;
 import hudson.model.Result;
@@ -21,12 +22,9 @@ import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.fluent.Request;
 import org.apache.http.util.EntityUtils;
-import org.cloudfoundry.client.lib.CloudCredentials;
-import org.cloudfoundry.client.lib.CloudFoundryClient;
-import org.cloudfoundry.client.lib.domain.CloudService;
+import org.cloudfoundry.client.CloudFoundryClient;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Rule;
 import org.junit.Test;
 import org.jvnet.hudson.test.ExtractResourceSCM;
 import org.jvnet.hudson.test.JenkinsRule;
@@ -36,10 +34,28 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.regex.Pattern;
+import org.cloudfoundry.client.v2.applications.DeleteApplicationRequest;
+import org.cloudfoundry.client.v2.serviceinstances.DeleteServiceInstanceRequest;
+import org.cloudfoundry.doppler.DopplerClient;
+import org.cloudfoundry.operations.CloudFoundryOperations;
+import org.cloudfoundry.operations.DefaultCloudFoundryOperations;
+import org.cloudfoundry.operations.applications.GetApplicationRequest;
+import org.cloudfoundry.operations.services.CreateServiceInstanceRequest;
+import org.cloudfoundry.reactor.ConnectionContext;
+import org.cloudfoundry.reactor.DefaultConnectionContext;
+import org.cloudfoundry.reactor.TokenProvider;
+import org.cloudfoundry.reactor.client.ReactorCloudFoundryClient;
+import org.cloudfoundry.reactor.doppler.ReactorDopplerClient;
+import org.cloudfoundry.reactor.tokenprovider.PasswordGrantTokenProvider;
+import org.cloudfoundry.reactor.uaa.ReactorUaaClient;
+import org.cloudfoundry.uaa.UaaClient;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeNotNull;
+import org.junit.ClassRule;
 
 public class CloudFoundryPushPublisherTest {
 
@@ -54,8 +70,29 @@ public class CloudFoundryPushPublisherTest {
 
     private static CloudFoundryClient client;
 
-    @Rule
-    public JenkinsRule j = new JenkinsRule();
+    private static CloudFoundryOperations cloudFoundryOperations;
+
+    @ClassRule
+    public static JenkinsRule j = new JenkinsRule();
+
+    private static Optional<org.cloudfoundry.reactor.ProxyConfiguration> buildProxyConfiguration(URL targetURL) {
+        ProxyConfiguration proxyConfig = j.getInstance().proxy;
+        if (proxyConfig == null) {
+            return Optional.empty();
+        }
+
+        String host = targetURL.getHost();
+        for (Pattern p : proxyConfig.getNoProxyHostPatterns()) {
+            if (p.matcher(host).matches()) {
+                return Optional.empty();
+            }
+        }
+
+        return Optional.of(org.cloudfoundry.reactor.ProxyConfiguration.builder()
+            .host(proxyConfig.name)
+            .port(proxyConfig.port)
+            .build());
+    }
 
 
     @BeforeClass
@@ -73,15 +110,54 @@ public class CloudFoundryPushPublisherTest {
         }
         URL targetUrl = new URL(fullTarget);
 
-        CloudCredentials credentials = new CloudCredentials(TEST_USERNAME, TEST_PASSWORD);
-        client = new CloudFoundryClient(credentials, targetUrl, TEST_ORG, TEST_SPACE);
-        client.login();
+        ConnectionContext connectionContext = DefaultConnectionContext.builder()
+                .apiHost(targetUrl.getHost())
+                .proxyConfiguration(buildProxyConfiguration(targetUrl))
+                .skipSslValidation(true)
+                .build();
+
+        TokenProvider tokenProvider = PasswordGrantTokenProvider.builder()
+            .username(TEST_USERNAME)
+            .password(TEST_PASSWORD)
+            .build();
+
+        client = ReactorCloudFoundryClient.builder()
+            .connectionContext(connectionContext)
+            .tokenProvider(tokenProvider)
+            .build();
+
+        DopplerClient dopplerClient = ReactorDopplerClient.builder()
+            .connectionContext(connectionContext)
+            .tokenProvider(tokenProvider)
+            .build();
+
+        UaaClient uaaClient = ReactorUaaClient.builder()
+            .connectionContext(connectionContext)
+            .tokenProvider(tokenProvider)
+            .build();
+
+        cloudFoundryOperations = DefaultCloudFoundryOperations.builder()
+            .cloudFoundryClient(client)
+            .dopplerClient(dopplerClient)
+            .uaaClient(uaaClient)
+            .organization(TEST_ORG)
+            .space(TEST_SPACE)
+            .build();
     }
 
     @Before
     public void cleanCloudSpace() throws IOException {
-        client.deleteAllApplications();
-        client.deleteAllServices();
+        cloudFoundryOperations.applications()
+            .list()
+            .map(application -> DeleteApplicationRequest.builder().applicationId(application.getId()).build())
+            .flatMap(request -> client.applicationsV2().delete(request))
+            .blockLast();
+
+        cloudFoundryOperations.services()
+            .listInstances()
+            .map(service -> DeleteServiceInstanceRequest.builder().serviceInstanceId(service.getId()).build())
+            .flatMap(request -> client.serviceInstances().delete(request))
+            .blockLast();
 
         CredentialsStore store = CredentialsProvider.lookupStores(j.getInstance()).iterator().next();
         store.addCredentials(Domain.global(),
@@ -168,7 +244,7 @@ public class CloudFoundryPushPublisherTest {
 
         assertTrue("Build 1 did not succeed", build.getResult().isBetterOrEqualTo(Result.SUCCESS));
         assertTrue("Build 1 did not display staging logs", log.contains("Downloaded app package"));
-        assertEquals(512, client.getApplication("hello-java").getMemory());
+        assertEquals((long) 512, (long) cloudFoundryOperations.applications().get(GetApplicationRequest.builder().name("hello-java").build()).block().getMemoryLimit());
 
         project.getPublishersList().remove(cf1);
 
@@ -186,7 +262,7 @@ public class CloudFoundryPushPublisherTest {
 
         assertTrue("Build 2 did not succeed", build.getResult().isBetterOrEqualTo(Result.SUCCESS));
         assertTrue("Build 2 did not display staging logs", log.contains("Downloaded app package"));
-        assertEquals(256, client.getApplication("hello-java").getMemory());
+        assertEquals((long) 256, (long) cloudFoundryOperations.applications().get(GetApplicationRequest.builder().name("hello-java").build()).block().getMemoryLimit());
     }
 
     @Test
@@ -279,7 +355,7 @@ public class CloudFoundryPushPublisherTest {
         String content1 = EntityUtils.toString(response1.getEntity());
         System.out.println(content1);
         assertTrue("hello-java-1 did not send back correct text", content1.contains("Hello from"));
-        assertEquals(200, client.getApplication("hello-java-1").getMemory());
+        assertEquals((long) 200, (long) cloudFoundryOperations.applications().get(GetApplicationRequest.builder().name("hello-java-1").build()).block().getMemoryLimit());
         String uri2 = appUris.get(1);
         Request request2 = Request.Get(uri2);
         HttpResponse response2 = request2.execute().returnResponse();
@@ -288,7 +364,7 @@ public class CloudFoundryPushPublisherTest {
         String content2 = EntityUtils.toString(response2.getEntity());
         System.out.println(content2);
         assertTrue("hello-java-2 did not send back correct text", content2.contains("Hello from"));
-        assertEquals(300, client.getApplication("hello-java-2").getMemory());
+        assertEquals((long) 300, (long) cloudFoundryOperations.applications().get(GetApplicationRequest.builder().name("hello-java-2").build()).block().getMemoryLimit());
     }
 
     @Test
@@ -379,17 +455,17 @@ public class CloudFoundryPushPublisherTest {
 
     @Test
     public void testPerformServicesNamesManifestFile() throws Exception {
-        CloudService service1 = new CloudService();
-        service1.setName("mysql_service1");
-        service1.setLabel(TEST_MYSQL_SERVICE_TYPE);
-        service1.setPlan(TEST_SERVICE_PLAN);
-        client.createService(service1);
+        cloudFoundryOperations.services().createInstance(CreateServiceInstanceRequest.builder()
+            .serviceName("mysql_service1")
+            .tag(TEST_MYSQL_SERVICE_TYPE)
+            .planName(TEST_SERVICE_PLAN)
+            .build()).block();
 
-        CloudService service2 = new CloudService();
-        service2.setName("mysql_service2");
-        service2.setLabel(TEST_MYSQL_SERVICE_TYPE);
-        service2.setPlan(TEST_SERVICE_PLAN);
-        client.createService(service2);
+        cloudFoundryOperations.services().createInstance(CreateServiceInstanceRequest.builder()
+            .serviceName("mysql_service2")
+            .tag(TEST_MYSQL_SERVICE_TYPE)
+            .planName(TEST_SERVICE_PLAN)
+            .build()).block();
 
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("python-env-services.zip")));
@@ -452,12 +528,12 @@ public class CloudFoundryPushPublisherTest {
 
     @Test
     public void testPerformResetService() throws Exception {
-        CloudService existingService = new CloudService();
-        existingService.setName("mysql-spring");
-        // Not the right type of service, must be reset for hello-mysql-spring to work
-        existingService.setLabel(TEST_NONMYSQL_SERVICE_TYPE);
-        existingService.setPlan(TEST_SERVICE_PLAN);
-        client.createService(existingService);
+        cloudFoundryOperations.services().createInstance(CreateServiceInstanceRequest.builder()
+            .serviceName("mysql-spring")
+            // Not the right type of service, must be reset for hello-mysql-spring to work
+            .tag(TEST_NONMYSQL_SERVICE_TYPE)
+            .planName(TEST_SERVICE_PLAN)
+            .build()).block();
 
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("hello-spring-mysql.zip")));

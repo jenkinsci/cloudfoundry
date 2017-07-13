@@ -24,13 +24,7 @@ import hudson.tasks.Recorder;
 import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
 import hudson.util.Secret;
-import jenkins.model.Jenkins;
-import net.lingala.zip4j.core.ZipFile;
-import net.lingala.zip4j.exception.ZipException;
-import org.apache.tomcat.util.http.fileupload.FileUtils;
-import org.cloudfoundry.client.lib.*;
-import org.cloudfoundry.client.lib.domain.*;
-import org.cloudfoundry.client.lib.org.springframework.web.client.ResourceAccessException;
+
 import org.jenkinsci.plugins.tokenmacro.MacroEvaluationException;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
@@ -41,11 +35,45 @@ import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.UnknownHostException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Pattern;
+
+import org.cloudfoundry.client.CloudFoundryClient;
+import org.cloudfoundry.client.v2.ClientV2Exception;
+import org.cloudfoundry.client.v2.info.GetInfoRequest;
+import org.cloudfoundry.doppler.DopplerClient;
+import org.cloudfoundry.doppler.LogMessage;
+import org.cloudfoundry.operations.CloudFoundryOperations;
+import org.cloudfoundry.operations.DefaultCloudFoundryOperations;
+import org.cloudfoundry.operations.applications.ApplicationDetail;
+import org.cloudfoundry.operations.applications.GetApplicationRequest;
+import org.cloudfoundry.operations.applications.LogsRequest;
+import org.cloudfoundry.operations.applications.PushApplicationRequest;
+import org.cloudfoundry.operations.applications.RestartApplicationRequest;
+import org.cloudfoundry.operations.applications.ScaleApplicationRequest;
+import org.cloudfoundry.operations.applications.SetEnvironmentVariableApplicationRequest;
+import org.cloudfoundry.operations.applications.StartApplicationRequest;
+import org.cloudfoundry.operations.routes.ListRoutesRequest;
+import org.cloudfoundry.operations.routes.UnmapRouteRequest;
+import org.cloudfoundry.operations.services.BindServiceInstanceRequest;
+import org.cloudfoundry.operations.services.CreateServiceInstanceRequest;
+import org.cloudfoundry.operations.services.DeleteServiceInstanceRequest;
+import org.cloudfoundry.operations.services.ServiceInstanceSummary;
+import org.cloudfoundry.reactor.ConnectionContext;
+import org.cloudfoundry.reactor.DefaultConnectionContext;
+import org.cloudfoundry.reactor.TokenProvider;
+import org.cloudfoundry.reactor.client.ReactorCloudFoundryClient;
+import org.cloudfoundry.reactor.doppler.ReactorDopplerClient;
+import org.cloudfoundry.reactor.tokenprovider.PasswordGrantTokenProvider;
+import org.cloudfoundry.reactor.uaa.ReactorUaaClient;
+import org.cloudfoundry.uaa.UaaClient;
+
+import reactor.core.publisher.BaseSubscriber;
+import reactor.core.publisher.Flux;
 
 public class CloudFoundryPushPublisher extends Recorder {
 
@@ -108,7 +136,7 @@ public class CloudFoundryPushPublisher extends Recorder {
 
         try {
             String jenkinsBuildName = build.getProject().getDisplayName();
-            URL targetUrl = new URL(target);
+            URL targetUrl = new URL("https://" + target);
 
             List<StandardUsernamePasswordCredentials> standardCredentials = CredentialsProvider.lookupCredentials(
                     StandardUsernamePasswordCredentials.class,
@@ -124,30 +152,54 @@ public class CloudFoundryPushPublisher extends Recorder {
                 return false;
             }
 
-            CloudCredentials cloudCredentials =
-                    new CloudCredentials(credentials.getUsername(), Secret.toString(credentials.getPassword()));
-            HttpProxyConfiguration proxyConfig = buildProxyConfiguration(targetUrl);
+            // TODO: move this into a CloudFoundryOperations factory method and
+            // share it with doTestConnection.
+            ConnectionContext connectionContext = DefaultConnectionContext.builder()
+                .apiHost(target)
+                .proxyConfiguration(buildProxyConfiguration(targetUrl))
+                .skipSslValidation(selfSigned)
+                .build();
 
-            CloudFoundryClient client = new CloudFoundryClient(cloudCredentials, targetUrl, organization, cloudSpace,
-                    proxyConfig, selfSigned);
-            client.login();
+            TokenProvider tokenProvider = PasswordGrantTokenProvider.builder()
+                .username(credentials.getUsername())
+                .password(Secret.toString(credentials.getPassword()))
+                .build();
 
-            String domain = client.getDefaultDomain().getName();
+            CloudFoundryClient client = ReactorCloudFoundryClient.builder()
+                .connectionContext(connectionContext)
+                .tokenProvider(tokenProvider)
+                .build();
 
+            DopplerClient dopplerClient = ReactorDopplerClient.builder()
+                .connectionContext(connectionContext)
+                .tokenProvider(tokenProvider)
+                .build();
+
+            UaaClient uaaClient = ReactorUaaClient.builder()
+                .connectionContext(connectionContext)
+                .tokenProvider(tokenProvider)
+                .build();
+
+            CloudFoundryOperations cloudFoundryOperations = DefaultCloudFoundryOperations.builder()
+                .cloudFoundryClient(client)
+                .dopplerClient(dopplerClient)
+                .uaaClient(uaaClient)
+                .organization(organization)
+                .space(cloudSpace)
+                .build();
+
+            String domain = cloudFoundryOperations.domains().list().blockFirst().getName();
 
             // Create services before push
-            List<CloudService> currentServicesList = client.getServices();
-            List<String> currentServicesNames = new ArrayList<String>();
-            for (CloudService currentService : currentServicesList) {
-                currentServicesNames.add(currentService.getName());
-            }
+            Flux<ServiceInstanceSummary> currentServicesList = cloudFoundryOperations.services().listInstances();
+            List<String> currentServicesNames = currentServicesList.map(service -> service.getName()).collectList().block();
 
             for (Service service : servicesToCreate) {
                 boolean createService = true;
                 if (currentServicesNames.contains(service.name)) {
                     if (service.resetService) {
                         listener.getLogger().println("Service " + service.name + " already exists, resetting.");
-                        client.deleteService(service.name);
+                        cloudFoundryOperations.services().deleteInstance(DeleteServiceInstanceRequest.builder().name(service.name).build()).block();
                         listener.getLogger().println("Service deleted.");
                     } else {
                         createService = false;
@@ -156,11 +208,11 @@ public class CloudFoundryPushPublisher extends Recorder {
                 }
                 if (createService) {
                     listener.getLogger().println("Creating service " + service.name);
-                    CloudService cloudService = new CloudService();
-                    cloudService.setName(service.name);
-                    cloudService.setLabel(service.type);
-                    cloudService.setPlan(service.plan);
-                    client.createService(cloudService);
+                    cloudFoundryOperations.services().createInstance(CreateServiceInstanceRequest.builder()
+                        .serviceName(service.type)
+                        .serviceInstanceName(service.name)
+                        .planName(service.plan)
+                        .build()).block();
                 }
             }
 
@@ -185,37 +237,13 @@ public class CloudFoundryPushPublisher extends Recorder {
 
             boolean success = true;
             for (DeploymentInfo deploymentInfo : allDeploymentInfo) {
-                boolean lastSuccess = processOneApp(client, deploymentInfo, build, listener);
+                boolean lastSuccess = processOneApp(cloudFoundryOperations, deploymentInfo, build, listener);
                 // If an app fails, the build status is failure, but we should still try pushing them
                 success = success && lastSuccess;
             }
             return success;
         } catch (MalformedURLException e) {
             listener.getLogger().println("ERROR: The target URL is not valid: " + e.getMessage());
-            return false;
-        } catch (ResourceAccessException e) {
-            if (e.getCause() instanceof UnknownHostException) {
-                listener.getLogger().println("ERROR: Unknown host: " + e.getMessage());
-            } else if (e.getCause() instanceof SSLPeerUnverifiedException) {
-                listener.getLogger().println("ERROR: Certificate is not verified: " + e.getMessage());
-            } else {
-                listener.getLogger().println("ERROR: Unknown ResourceAccessException: " + e.getMessage());
-            }
-            return false;
-        } catch (CloudFoundryException e) {
-            if (e.getMessage().equals("403 Access token denied.")) {
-                listener.getLogger().println("ERROR: Wrong username or password: " + e.getMessage());
-            } else {
-                listener.getLogger().println("ERROR: Unknown CloudFoundryException: " + e.getMessage());
-                listener.getLogger().println("ERROR: Cloud Foundry error code: " + e.getCloudFoundryErrorCode());
-                if (e.getDescription() != null) {
-                    listener.getLogger().println("ERROR: " + e.getDescription());
-                }
-                e.printStackTrace(listener.getLogger());
-            }
-            return false;
-        } catch (CloudOperationException e) {
-            listener.getLogger().println("ERROR: Target returned an error: " + e.getMessage());
             return false;
         } catch (ManifestParsingException e) {
             listener.getLogger().println("ERROR: Could not parse manifest: " + e.getMessage());
@@ -235,250 +263,167 @@ public class CloudFoundryPushPublisher extends Recorder {
         }
     }
 
-    private boolean processOneApp(CloudFoundryClient client, DeploymentInfo deploymentInfo, AbstractBuild build,
-                                  BuildListener listener) throws IOException, InterruptedException {
-        try {
-            String appName = deploymentInfo.getAppName();
-            String appURI = "https://" + deploymentInfo.getHostname() + "." + deploymentInfo.getDomain();
+    private boolean processOneApp(CloudFoundryOperations cloudFoundryOperations, DeploymentInfo deploymentInfo, AbstractBuild build,
+                                  BuildListener listener) throws IOException, InterruptedException  {
+        String appName = deploymentInfo.getAppName();
+        String appURI = null;
+
+        listener.getLogger().println("Pushing " + appName + " app to " + target);
+
+        // Create app if it doesn't already exist, or if resetIfExists parameter is true
+        boolean createdNewApp = createApplicationIfNeeded(cloudFoundryOperations, listener, deploymentInfo, appName, build);
+
+        // Unbind all routes if no-route parameter is set
+        if (deploymentInfo.isNoRoute()) {
+            cloudFoundryOperations.routes().unmap(UnmapRouteRequest.builder()
+                .applicationName(appName)
+                .build()).block();
+        } else {
+          appURI = cloudFoundryOperations.routes().list(ListRoutesRequest.builder().build())
+              .filter(route -> route.getApplications().contains(appName))
+              .map(route -> new StringBuilder("https://").append(route.getHost()).append(".").append(route.getDomain()).append(route.getPath()))
+              .map(sb -> sb.toString())
+              .blockFirst();
+          if (appURI != null) {
             addToAppURIs(appURI);
-
-            listener.getLogger().println("Pushing " + appName + " app to " + target);
-
-            // Create app if it doesn't already exist, or if resetIfExists parameter is true
-            boolean createdNewApp = createApplicationIfNeeded(client, listener, deploymentInfo, appURI);
-
-            // Unbind all routes if no-route parameter is set
-            if (deploymentInfo.isNoRoute()) {
-                client.updateApplicationUris(appName, new ArrayList<String>());
-            }
-
-            // Add environment variables
-            if (!deploymentInfo.getEnvVars().isEmpty()) {
-                Map<String, Object> appEnvs = client.getApplicationEnvironment(appName);
-                Map<String, String> newEnvs = new HashMap<String, String>();
-                // Unavoidable cast warning
-                newEnvs.putAll((Map<String, String>) appEnvs.get("environment_json"));
-                newEnvs.putAll(deploymentInfo.getEnvVars());
-                client.updateApplicationEnv(appName, newEnvs);
-            }
-
-            // Change number of instances
-            if (deploymentInfo.getInstances() > 1) {
-                client.updateApplicationInstances(appName, deploymentInfo.getInstances());
-            }
-
-            // Push files
-            listener.getLogger().println("Pushing app bits.");
-            pushAppBits(build, listener, deploymentInfo, client);
-
-            // Start or restart application
-            StartingInfo startingInfo;
-            if (createdNewApp) {
-                listener.getLogger().println("Starting application.");
-                startingInfo = client.startApplication(appName);
-            } else {
-                listener.getLogger().println("Restarting application.");
-                startingInfo = client.restartApplication(appName);
-            }
-
-            // Start printing the staging logs
-            printStagingLogs(client, listener, startingInfo, appName);
-
-            CloudApplication app = client.getApplication(appName);
-
-            // Keep checking to see if the app is running
-            int running = 0;
-            int totalInstances = 0;
-            for (int tries = 0; tries < pluginTimeout; tries++) {
-                running = 0;
-                InstancesInfo instancesInfo = client.getApplicationInstances(app);
-                if (instancesInfo != null) {
-                    List<InstanceInfo> listInstances = instancesInfo.getInstances();
-                    totalInstances = listInstances.size();
-                    for (InstanceInfo instance : listInstances) {
-                        if (instance.getState() == InstanceState.RUNNING) {
-                            running++;
-                        }
-                    }
-                    if (running == totalInstances && totalInstances > 0) {
-                        break;
-                    }
-                }
-                Thread.sleep(1000);
-            }
-
-            String instanceGrammar = "instances";
-            if (running == 1)
-                instanceGrammar = "instance";
-            listener.getLogger().println(running + " " + instanceGrammar + " running out of " + totalInstances);
-
-            if (running > 0) {
-                if (running != totalInstances) {
-                    listener.getLogger().println("WARNING: Some instances of the application are not running.");
-                }
-                if (deploymentInfo.isNoRoute()) {
-                    listener.getLogger().println("Application is now running. (No route)");
-                } else {
-                    listener.getLogger().println("Application is now running at " + appURI);
-                }
-                listener.getLogger().println("Cloud Foundry push successful.");
-                return true;
-            } else {
-                listener.getLogger().println(
-                        "ERROR: The application failed to start after " + pluginTimeout + " seconds.");
-                listener.getLogger().println("Cloud Foundry push failed.");
-                return false;
-            }
-        } catch (CloudFoundryException e) {
-            listener.getLogger().println("ERROR: Unknown CloudFoundryException: " + e.getMessage());
-            listener.getLogger().println("ERROR: Cloud Foundry error code: " + e.getCloudFoundryErrorCode());
-            if (e.getDescription() != null) {
-                listener.getLogger().println("ERROR: " + e.getDescription());
-            }
-            e.printStackTrace(listener.getLogger());
-            return false;
-        } catch (FileNotFoundException e) {
-            listener.getLogger().println("ERROR: Could not find file: " + e.getMessage());
-            return false;
-        } catch (ZipException e) {
-            listener.getLogger().println("ERROR: ZipException: " + e.getMessage());
-            return false;
-        } catch (IllegalArgumentException e) {
-            listener.getLogger().println("ERROR: IllegalArgumentException: " + e.getMessage());
-            return false;
+          }
         }
-    }
 
-    private boolean createApplicationIfNeeded(CloudFoundryClient client, BuildListener listener,
-                                              DeploymentInfo deploymentInfo, String appURI) {
-        // Check if app already exists
-        List<CloudApplication> existingApps = client.getApplications();
-        boolean createNewApp = true;
-        for (CloudApplication app : existingApps) {
-            if (app.getName().equals(deploymentInfo.getAppName())) {
-                if (resetIfExists) {
-                    listener.getLogger().println("App already exists, resetting.");
-                    client.deleteApplication(deploymentInfo.getAppName());
-                    listener.getLogger().println("App deleted.");
-                } else {
-                    createNewApp = false;
-                    listener.getLogger().println("App already exists, skipping creation.");
-                }
+        // Add environment variables
+        if (!deploymentInfo.getEnvVars().isEmpty()) {
+            Flux.fromStream(deploymentInfo.getEnvVars().entrySet().stream())
+                .map(e -> SetEnvironmentVariableApplicationRequest.builder().name(appName).variableName(e.getKey()).variableValue(e.getValue()).build())
+                .map(request -> cloudFoundryOperations.applications().setEnvironmentVariable(request))
+                .blockLast();
+        }
+
+        // Change number of instances
+        if (deploymentInfo.getInstances() > 1) {
+          cloudFoundryOperations.applications().scale(ScaleApplicationRequest.builder().name(appName).instances(deploymentInfo.getInstances()).build()).block();
+        }
+
+        // Start or restart application
+        if (createdNewApp) {
+            listener.getLogger().println("Starting application.");
+            cloudFoundryOperations.applications().start(StartApplicationRequest.builder().name(appName).build()).block();
+        } else {
+            listener.getLogger().println("Restarting application.");
+            cloudFoundryOperations.applications().restart(RestartApplicationRequest.builder().name(appName).build()).block();
+        }
+
+        // Start printing the staging logs
+        printStagingLogs(cloudFoundryOperations, listener, appName);
+
+        // Keep checking to see if the app is running
+        int running = 0;
+        int totalInstances = 0;
+        for (int tries = 0; tries < pluginTimeout; tries++) {
+            running = 0;
+            ApplicationDetail app = cloudFoundryOperations.applications().get(GetApplicationRequest.builder().name(appName).build()).block();
+            totalInstances = app.getInstances();
+            running = app.getRunningInstances();
+            if (running == totalInstances && totalInstances > 0) {
                 break;
             }
+            Thread.sleep(1000);
         }
 
-        // Create app if it doesn't exist
-        if (createNewApp) {
-            listener.getLogger().println("Creating new app.");
-            String stack = deploymentInfo.getStack();
-            if (stack != null && client.getStack(stack) == null) {
-                throw new IllegalArgumentException("Stack " + stack + " does not exist on the target.");
+        String instanceGrammar = "instances";
+        if (running == 1)
+            instanceGrammar = "instance";
+        listener.getLogger().println(running + " " + instanceGrammar + " running out of " + totalInstances);
+
+        if (running > 0) {
+            if (running != totalInstances) {
+                listener.getLogger().println("WARNING: Some instances of the application are not running.");
             }
-            Staging staging = new Staging(deploymentInfo.getCommand(), deploymentInfo.getBuildpack(),
-                    deploymentInfo.getStack(), deploymentInfo.getTimeout());
-            List<String> uris = new ArrayList<String>();
-            // Pass an empty List as the uri list if no-route is set
-            if (!deploymentInfo.isNoRoute()) {
-                uris.add(appURI);
-            }
-            List<String> services = deploymentInfo.getServicesNames();
-            client.createApplication(deploymentInfo.getAppName(), staging, deploymentInfo.getMemory(), uris, services);
-        }
-
-        return createNewApp;
-    }
-
-    private void pushAppBits(AbstractBuild build, BuildListener listener, DeploymentInfo deploymentInfo,
-                             CloudFoundryClient client)
-            throws IOException, InterruptedException, ZipException {
-        FilePath appPath = new FilePath(build.getWorkspace(), deploymentInfo.getAppPath());
-
-        if (appPath.getChannel() != Jenkins.MasterComputer.localChannel) {
-            if (appPath.isDirectory()) {
-                // The build is distributed, and a directory
-                // We need to make a copy of the target directory on the master
-                File tempAppFile = File.createTempFile("appFile", null); // This is on the master
-                OutputStream outputStream = new FileOutputStream(tempAppFile);
-                appPath.zip(outputStream);
-
-                // We now have a zip file on the master, extract it into a directory
-                ZipFile appZipFile = new ZipFile(tempAppFile);
-                File tempOutputDirectory = new File(tempAppFile.getAbsolutePath().split("\\.")[0]);
-                appZipFile.extractAll(tempOutputDirectory.getAbsolutePath());
-                // appPath.zip() creates a top level directory that we want to remove
-                File[] listFiles = tempOutputDirectory.listFiles();
-                if (listFiles != null && listFiles.length == 1) {
-                    tempOutputDirectory = listFiles[0];
-                } else {
-                    // This should never happen because appPath.zip() always makes a directory
-                    throw new IllegalStateException("Unzipped output directory was empty.");
-                }
-                // We can now use tempOutputDirectory which is a copy of the target directory but on master
-                client.uploadApplication(deploymentInfo.getAppName(), tempOutputDirectory);
-                // Delete temporary files
-                boolean deleted = tempAppFile.delete();
-                try {
-                    FileUtils.deleteDirectory(tempOutputDirectory);
-                } catch (IOException e) {
-                    deleted = false;
-                }
-                if (!deleted) {
-                    listener.getLogger().println("WARNING: Temporary files were not deleted successfully.");
-                }
-
+            if (deploymentInfo.isNoRoute()) {
+                listener.getLogger().println("Application is now running. (No route)");
             } else {
-                // If the target path is a single file, we can just use an InputStream
-                // The CF client will make a temp file on the master from the InputStream
-                client.uploadApplication(deploymentInfo.getAppName(), appPath.getName(), appPath.read());
-
+                listener.getLogger().println("Application is now running at " + appURI);
             }
+            listener.getLogger().println("Cloud Foundry push successful.");
+            return true;
         } else {
-            // If the build is not distributed, we can convert the FilePath to a File without problems
-            File targetFile = new File(appPath.toURI());
-            client.uploadApplication(deploymentInfo.getAppName(), targetFile);
+            listener.getLogger().println(
+                    "ERROR: The application failed to start after " + pluginTimeout + " seconds.");
+            listener.getLogger().println("Cloud Foundry push failed.");
+            return false;
         }
     }
 
-    private void printStagingLogs(CloudFoundryClient client, BuildListener listener,
-                                  StartingInfo startingInfo, String appName) {
-        // First, try streamLogs()
-        try {
-            JenkinsApplicationLogListener logListener = new JenkinsApplicationLogListener(listener);
-            client.streamLogs(appName, logListener);
-        } catch (Exception e) {
-            // In case of failure, try getStagingLogs()
-            listener.getLogger().println("WARNING: Exception occurred trying to get staging logs via websocket. " +
-                    "Switching to alternate method.");
-            int offset = 0;
-            String stagingLogs = client.getStagingLogs(startingInfo, offset);
-            if (stagingLogs == null) {
-                listener.getLogger().println("WARNING: Could not get staging logs with alternate method. " +
-                        "Cannot display staging logs.");
-            } else {
-                while (stagingLogs != null) {
-                    listener.getLogger().println(stagingLogs);
-                    offset += stagingLogs.length();
-                    stagingLogs = client.getStagingLogs(startingInfo, offset);
-                }
+    private boolean createApplicationIfNeeded(CloudFoundryOperations cloudFoundryOperations, BuildListener listener,
+                                              DeploymentInfo deploymentInfo, String appName, AbstractBuild build) throws IOException, InterruptedException {
+
+        // Check if app already exists
+        boolean applicationExists = cloudFoundryOperations.applications().list()
+            .any(app -> app.getName().equals(appName))
+            .block();
+
+        listener.getLogger().println(applicationExists ? "Updating existing app." : "Creating new app.");
+
+        cloudFoundryOperations.applications().push(PushApplicationRequest.builder()
+            .name(appName)
+            .command(deploymentInfo.getCommand())
+            .buildpack(deploymentInfo.getBuildpack())
+            .stack(deploymentInfo.getStack())
+            .timeout(deploymentInfo.getTimeout())
+            .memory(deploymentInfo.getMemory())
+            .noRoute(deploymentInfo.isNoRoute())
+            .routePath(null) // TODO add routePath to DeploymentInfo
+            .randomRoute(!deploymentInfo.isNoRoute()) // TODO add randomRoute to DeploymentInfo
+            .path(Paths.get(new FilePath(build.getWorkspace(), deploymentInfo.getAppPath()).toURI()))
+            .build()).block();
+
+        if (deploymentInfo.getServicesNames() != null && !deploymentInfo.getServicesNames().isEmpty()) {
+          listener.getLogger().println("Binding services to app.");
+          Flux.fromStream(deploymentInfo.getServicesNames().stream())
+              .map(serviceName -> BindServiceInstanceRequest.builder().applicationName(appName).serviceInstanceName(serviceName).build())
+              .flatMap(request -> cloudFoundryOperations.services().bind(request))
+              .blockLast();
+        }
+        return !applicationExists;
+    }
+
+    private void printStagingLogs(CloudFoundryOperations cloudFoundryOperations,
+                                  final BuildListener listener, String appName) {
+       cloudFoundryOperations.applications().logs(LogsRequest.builder().name(appName).recent(Boolean.TRUE).build())
+                .filter(logMessage -> logMessage.getSourceType().startsWith("STG") || logMessage.getSourceType().startsWith("CELL"))
+           .subscribeWith(new BaseSubscriber<LogMessage>(){
+          @Override
+          protected void hookOnNext(LogMessage applicationLog) {
+            /*
+             * We are only interested in the staging logs, and per
+             * https://docs.cloudfoundry.org/devguide/deploy-apps/streaming-logs.html#stg
+             * "After the droplet has been uploaded, STG messages end and CELL messages begin",
+             * so once we see the first CELL message we know we're done with the STG ones.
+             */
+            if (applicationLog.getSourceType().startsWith("STG")) {
+              listener.getLogger().println(applicationLog.getMessage());
+            } else if (applicationLog.getSourceType().startsWith("CELL")) {
+              onComplete();
             }
-        }
+          }
+        });
     }
 
-    private static HttpProxyConfiguration buildProxyConfiguration(URL targetURL) {
+    private static Optional<org.cloudfoundry.reactor.ProxyConfiguration> buildProxyConfiguration(URL targetURL) {
         ProxyConfiguration proxyConfig = Hudson.getInstance().proxy;
         if (proxyConfig == null) {
-            return null;
+            return Optional.empty();
         }
 
         String host = targetURL.getHost();
         for (Pattern p : proxyConfig.getNoProxyHostPatterns()) {
             if (p.matcher(host).matches()) {
-                return null;
+                return Optional.empty();
             }
         }
 
-        return new HttpProxyConfiguration(proxyConfig.name, proxyConfig.port);
+        return Optional.of(org.cloudfoundry.reactor.ProxyConfiguration.builder()
+            .host(proxyConfig.name)
+            .port(proxyConfig.port)
+            .build());
     }
 
     public BuildStepMonitor getRequiredMonitorService() {
@@ -649,7 +594,7 @@ public class CloudFoundryPushPublisher extends Recorder {
                                                @QueryParameter("selfSigned") final boolean selfSigned) {
 
             try {
-                URL targetUrl = new URL(target);
+                URL targetUrl = new URL("https://" + target);
                 List<StandardUsernamePasswordCredentials> standardCredentials = CredentialsProvider.lookupCredentials(
                         StandardUsernamePasswordCredentials.class,
                         context,
@@ -658,15 +603,25 @@ public class CloudFoundryPushPublisher extends Recorder {
 
                 StandardUsernamePasswordCredentials credentials =
                         CredentialsMatchers.firstOrNull(standardCredentials, CredentialsMatchers.withId(credentialsId));
+                // TODO: move this into a CloudFoundryOperations factory method and
+                // share it with perform.
+                ConnectionContext connectionContext = DefaultConnectionContext.builder()
+                    .apiHost(target)
+                    .proxyConfiguration(buildProxyConfiguration(targetUrl))
+                    .skipSslValidation(selfSigned)
+                    .build();
 
-                CloudCredentials cloudCredentials =
-                        new CloudCredentials(credentials.getUsername(), Secret.toString(credentials.getPassword()));
-                HttpProxyConfiguration proxyConfig = buildProxyConfiguration(targetUrl);
+                TokenProvider tokenProvider = PasswordGrantTokenProvider.builder()
+                    .username(credentials.getUsername())
+                    .password(Secret.toString(credentials.getPassword()))
+                    .build();
 
-                CloudFoundryClient client = new CloudFoundryClient(cloudCredentials, targetUrl, organization,
-                        cloudSpace, proxyConfig, selfSigned);
-                client.login();
-                client.getCloudInfo();
+                CloudFoundryClient client = ReactorCloudFoundryClient.builder()
+                    .connectionContext(connectionContext)
+                    .tokenProvider(tokenProvider)
+                    .build();
+
+                client.info().get(GetInfoRequest.builder().build()).block();
                 if (targetUrl.getHost().startsWith("api.")) {
                     return FormValidation.okWithMarkup("<b>Connection successful!</b>");
                 } else {
@@ -677,41 +632,28 @@ public class CloudFoundryPushPublisher extends Recorder {
                 }
             } catch (MalformedURLException e) {
                 return FormValidation.error("Malformed target URL");
-            } catch (ResourceAccessException e) {
-                if (e.getCause() instanceof UnknownHostException) {
-                    return FormValidation.error("Unknown host");
-                } else if (e.getCause() instanceof SSLPeerUnverifiedException) {
-                    return FormValidation.error("Target's certificate is not verified " +
+            } catch(RuntimeException e) {
+                Throwable cause = e.getCause() != null ? e.getCause() : e;
+                if (cause instanceof ClientV2Exception) {
+                  return FormValidation.error("Client error. Code=%i, Error Code=%s, Description=%s", ((ClientV2Exception)e).getCode(), ((ClientV2Exception)e).getErrorCode(), ((ClientV2Exception)e).getDescription());
+                } else if (cause instanceof UnknownHostException) {
+                  return FormValidation.error("Unknown host");
+                } else if (cause instanceof SSLPeerUnverifiedException) {
+                  return FormValidation.error("Target's certificate is not verified " +
                             "(Add it to Java's keystore, or check the \"Allow self-signed\" box)");
                 } else {
-                    return FormValidation.error(e, "Unknown ResourceAccessException");
-                }
-            } catch (CloudFoundryException e) {
-                if (e.getMessage().equals("404 Not Found")) {
-                    return FormValidation.error("Could not find CF API info (Did you forget to add \"api.\"?)");
-                } else if (e.getMessage().equals("403 Access token denied.")) {
-                    return FormValidation.error("Wrong username or password");
-                } else {
-                    return FormValidation.error(e, "Unknown CloudFoundryException");
-                }
-            } catch (IllegalArgumentException e) {
-                if (e.getMessage().contains("No matching organization and space found")) {
-                    return FormValidation.error("Could not find Organization or Space");
-                } else {
-                    return FormValidation.error(e, "Unknown IllegalArgumentException");
+                  return FormValidation.error(e, "Unknown error");
                 }
             } catch (Exception e) {
                 return FormValidation.error(e, "Unknown Exception");
             }
-
-
         }
 
         @SuppressWarnings("unused")
         public FormValidation doCheckTarget(@QueryParameter String value) {
             if (!value.isEmpty()) {
                 try {
-                    URL targetUrl = new URL(value);
+                    URL targetUrl = new URL("https://" + value);
                 } catch (MalformedURLException e) {
                     return FormValidation.error("Malformed URL");
                 }

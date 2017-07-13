@@ -26,7 +26,7 @@ public class ManifestReader {
     private final FilePath manifestFile;
     private List<Map<String, Object>> applicationList;
 
-    public ManifestReader(FilePath manifestFile) throws ManifestParsingException, IOException {
+    public ManifestReader(FilePath manifestFile) throws ManifestParsingException, IOException, InterruptedException {
         this.manifestFile = manifestFile;
         this.applicationList = parseManifest();
     }
@@ -76,7 +76,7 @@ public class ManifestReader {
      * Returns the list of maps describing the applications.
      */
     private List<Map<String, Object>> parseManifest()
-            throws IOException, ManifestParsingException {
+            throws IOException, ManifestParsingException, InterruptedException {
         InputStream inputStream = manifestFile.read();
         Yaml yaml = new Yaml();
         Object parsedYaml;
