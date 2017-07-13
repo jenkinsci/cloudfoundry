@@ -7,16 +7,22 @@
       <name>William Gautier</name>
       <email>william.gautier@hpe.com</email>
     </developer>
+    <developer>
+      <id>sworisbreathing</id>
+      <name>Steven Swor</name>
+      <email>sworisbreathing@users.noreply.github.com</email>
+      <url>https://github.com/sworisbreathing</url>
+    </developer>
   </developers>
 
   <parent>
     <groupId>org.jenkins-ci.plugins</groupId>
     <artifactId>plugin</artifactId>
-    <version>1.532.3</version>
+    <version>2.32</version>
   </parent>
 
   <artifactId>cloudfoundry</artifactId>
-  <version>1.5.1-SNAPSHOT</version>
+  <version>2.0.0-SNAPSHOT</version>
   <packaging>hpi</packaging>
 
   <name>Cloud Foundry Plugin</name>
@@ -31,43 +37,90 @@
     </license>
   </licenses>
 
+  <properties>
+    <java.level.test>8</java.level.test>
+    <java.level>8</java.level>
+    <maven.compiler.target>1.8</maven.compiler.target>
+    <maven.compiler.source>1.8</maven.compiler.source>
+    <cloudfoundry.client.version>2.15.0.RELEASE</cloudfoundry.client.version>
+  </properties>
+
   <dependencies>
-    <!-- Temporarily using a custom version of the cf client lib, while a pull request gets accepted -->
     <dependency>
       <groupId>org.cloudfoundry</groupId>
-      <artifactId>cloudfoundry-client-lib-shaded-custom</artifactId>
-      <version>1.1.3</version>
+      <artifactId>cloudfoundry-client</artifactId>
+      <version>${cloudfoundry.client.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.cloudfoundry</groupId>
+      <artifactId>cloudfoundry-client-reactor</artifactId>
+      <version>${cloudfoundry.client.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>slf4j-api</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>jcl-over-slf4j</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <dependency>
+      <groupId>org.cloudfoundry</groupId>
+      <artifactId>cloudfoundry-operations</artifactId>
+      <version>${cloudfoundry.client.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>slf4j-api</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <dependency>
+      <groupId>io.projectreactor</groupId>
+      <artifactId>reactor-core</artifactId>
+      <version>3.0.7.RELEASE</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.projectreactor.ipc</groupId>
+      <artifactId>reactor-netty</artifactId>
+      <version>0.6.4.RELEASE</version>
     </dependency>
 
     <dependency>
       <groupId>org.yaml</groupId>
       <artifactId>snakeyaml</artifactId>
-      <version>1.14</version>
-    </dependency>
-
-    <dependency>
-      <groupId>net.lingala.zip4j</groupId>
-      <artifactId>zip4j</artifactId>
-      <version>1.3.1</version>
+      <version>1.18</version>
     </dependency>
 
     <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>fluent-hc</artifactId>
-      <version>4.2.5</version>
+      <version>4.5.3</version>
       <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>commons-codec</groupId>
+          <artifactId>commons-codec</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <dependency>
       <groupId>org.jenkins-ci.plugins</groupId>
       <artifactId>credentials</artifactId>
-      <version>1.21</version>
+      <version>2.1.13</version>
     </dependency>
 
     <dependency>
       <groupId>org.jenkins-ci.plugins</groupId>
       <artifactId>token-macro</artifactId>
-      <version>1.10</version>
+      <version>2.1</version>
     </dependency>
   </dependencies>
 
