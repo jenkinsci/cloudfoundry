@@ -1,3 +1,4 @@
+<?jelly escape-by-default='true'?>
 <div>
   By default, everything in your project's root folder will be pushed. Use this to specify a different path (for
   example, a 'target' folder).

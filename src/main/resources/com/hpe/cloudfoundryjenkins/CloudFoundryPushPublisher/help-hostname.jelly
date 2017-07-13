@@ -1,3 +1,4 @@
+<?jelly escape-by-default='true'?>
 <div>
   The hostname of the URI to access your application. If left empty, will default to the application name.
   <br/>

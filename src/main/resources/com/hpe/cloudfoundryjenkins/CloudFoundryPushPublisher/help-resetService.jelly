@@ -1,3 +1,4 @@
+<?jelly escape-by-default='true'?>
 <div>
   By default, if a service with the same name already exists, the plugin will cancel the creation of the new service.
   <br/>

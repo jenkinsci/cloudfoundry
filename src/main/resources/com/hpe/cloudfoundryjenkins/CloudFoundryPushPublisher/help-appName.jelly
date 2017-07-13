@@ -1,3 +1,4 @@
+<?jelly escape-by-default='true'?>
 <div>
   The application's name. If left empty, will default to the Jenkins build name.
 </div>

@@ -1,3 +1,4 @@
+<?jelly escape-by-default='true'?>
 <div>
   The time in seconds before the health-manager gives up on starting the application. The default is 60. Increase if
   your application needs a longer time to stage.

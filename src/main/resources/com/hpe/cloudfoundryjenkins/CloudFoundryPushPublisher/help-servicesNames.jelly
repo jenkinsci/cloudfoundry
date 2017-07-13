@@ -1,3 +1,4 @@
+<?jelly escape-by-default='true'?>
 <div>
   The name of services that must be binded to the application. An application can only bind to services instances that
   exist in the target App Space before the application is deployed.

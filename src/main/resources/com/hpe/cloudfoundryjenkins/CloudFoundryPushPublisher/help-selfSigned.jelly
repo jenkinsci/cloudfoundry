@@ -1,3 +1,4 @@
+<?jelly escape-by-default='true'?>
 <div>
   Allow self-signed SSL certificates from the target. Check this if you encounter a "Certificate not verified" error.
   You can also add self-signed certificates you trust your Java keystore, which will allow you to keep this checkbox

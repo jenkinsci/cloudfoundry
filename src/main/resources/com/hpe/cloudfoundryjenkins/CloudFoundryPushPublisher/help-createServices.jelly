@@ -1,3 +1,4 @@
+<?jelly escape-by-default='true'?>
 <div>
   If your application requires a service to be bound to the app, that service needs to be created beforehand.
   <br/>

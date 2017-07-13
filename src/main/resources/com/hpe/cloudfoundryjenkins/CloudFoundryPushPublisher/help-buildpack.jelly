@@ -1,3 +1,4 @@
+<?jelly escape-by-default='true'?>
 <div>
   If your application requires a custom buildpack, you can use this to specify its URL or name. Leave empty to use the
   default buildpack.
