@@ -149,6 +149,7 @@
   <modules>
     <module>cloudfoundry-jenkins-plugin</module>
     <module>hello-java</module>
+    <module>hello-spring-mysql</module>
   </modules>
 
 </project>
