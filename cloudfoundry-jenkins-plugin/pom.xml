@@ -87,6 +87,14 @@
       <type>war</type>
       <scope>test</scope>
     </dependency>
+
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>hello-spring-mysql</artifactId>
+      <version>${project.version}</version>
+      <type>war</type>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
@@ -124,6 +132,7 @@
               <descriptors>
                 <descriptor>src/test/assembly/hello-java.xml</descriptor>
                 <descriptor>src/test/assembly/hello-java-custom-manifest-location.xml</descriptor>
+                <descriptor>src/test/assembly/hello-spring-mysql.xml</descriptor>
               </descriptors>
               <outputDirectory>src/test/lib</outputDirectory>
             </configuration>

@@ -508,7 +508,7 @@ public class CloudFoundryPushPublisherTest {
     @Test
     public void testPerformCreateService() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
-        project.setScm(new ExtractResourceSCM(getClass().getResource("hello-spring-mysql.zip")));
+        project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-spring-mysql.zip")));
 
         Service mysqlService = new Service("mysql-spring", TEST_MYSQL_SERVICE_TYPE, TEST_SERVICE_PLAN, true);
         List<Service> serviceList = new ArrayList<Service>();
@@ -547,7 +547,7 @@ public class CloudFoundryPushPublisherTest {
             .build()).block();
 
         FreeStyleProject project = j.createFreeStyleProject();
-        project.setScm(new ExtractResourceSCM(getClass().getResource("hello-spring-mysql.zip")));
+        project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-spring-mysql.zip")));
 
         Service mysqlService = new Service("mysql-spring", TEST_MYSQL_SERVICE_TYPE, TEST_SERVICE_PLAN, true);
         List<Service> serviceList = new ArrayList<Service>();

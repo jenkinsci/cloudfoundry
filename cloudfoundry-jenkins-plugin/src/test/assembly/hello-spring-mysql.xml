@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/2.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.0.0 http://maven.apache.org/xsd/assembly-2.0.0.xsd">
+  <id>hello-spring-mysql</id>
+  <formats>
+    <format>zip</format>
+  </formats>
+  <includeBaseDirectory>false</includeBaseDirectory>
+  <dependencySets>
+    <dependencySet>
+      <includes>
+        <include>${project.groupId}:hello-spring-mysql:war:${project.version}</include>
+      </includes>
+      <scope>test</scope>
+    </dependencySet>
+  </dependencySets>
+  <files>
+    <file>
+      <source>src/test/cloudfoundry/hello-spring-mysql-manifest.yml</source>
+      <filtered>true</filtered>
+      <destName>manifest.yml</destName>
+    </file>
+  </files>
+</assembly>
