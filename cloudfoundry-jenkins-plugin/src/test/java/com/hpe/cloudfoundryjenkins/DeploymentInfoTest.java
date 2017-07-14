@@ -25,6 +25,8 @@ import static org.junit.Assert.*;
 
 public class DeploymentInfoTest {
 
+    private static final String PROJECT_VERSION = System.getProperty("project.version");
+
     @Rule
     public ExpectedException exception = ExpectedException.none();
 
@@ -47,7 +49,7 @@ public class DeploymentInfoTest {
         assertEquals(42, deploymentInfo.getTimeout());
         assertEquals(true, deploymentInfo.isNoRoute());
         assertEquals("testdomain.local", deploymentInfo.getDomain());
-        assertEquals("target" + File.separator + "hello-java-1.0.war", deploymentInfo.getAppPath());
+        assertEquals("target" + File.separator + "hello-java-" + PROJECT_VERSION + ".war", deploymentInfo.getAppPath());
         assertEquals("https://github.com/heroku/heroku-buildpack-hello", deploymentInfo.getBuildpack());
         assertEquals("customstack", deploymentInfo.getStack());
         assertEquals("echo Hello", deploymentInfo.getCommand());
@@ -137,7 +139,7 @@ public class DeploymentInfoTest {
         services.add(new CloudFoundryPushPublisher.ServiceName("service_name_three"));
         CloudFoundryPushPublisher.ManifestChoice jenkinsManifest =
                 new CloudFoundryPushPublisher.ManifestChoice("jenkinsConfig", null, "hello-java", 512, "testhost", 4, 42, true,
-                        "target/hello-java-1.0.war",
+                        "hello-java-" + PROJECT_VERSION + ".war",
                         "https://github.com/heroku/heroku-buildpack-hello", "customstack",
                         "echo Hello", "testdomain.local", envVars, services);
         DeploymentInfo deploymentInfo =
@@ -150,7 +152,7 @@ public class DeploymentInfoTest {
         assertEquals(42, deploymentInfo.getTimeout());
         assertEquals(true, deploymentInfo.isNoRoute());
         assertEquals("testdomain.local", deploymentInfo.getDomain());
-        assertEquals("target" + File.separator + "hello-java-1.0.war", deploymentInfo.getAppPath());
+        assertEquals("target" + File.separator + "hello-java-" + PROJECT_VERSION + ".war", deploymentInfo.getAppPath());
         assertEquals("https://github.com/heroku/heroku-buildpack-hello", deploymentInfo.getBuildpack());
         assertEquals("customstack", deploymentInfo.getStack());
         assertEquals("echo Hello", deploymentInfo.getCommand());

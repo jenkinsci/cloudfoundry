@@ -79,6 +79,14 @@
       <groupId>org.jenkins-ci.plugins</groupId>
       <artifactId>token-macro</artifactId>
     </dependency>
+
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>hello-java</artifactId>
+      <version>${project.version}</version>
+      <type>war</type>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
@@ -96,10 +104,42 @@
             <mysqlServiceType>${cloudfoundry.mysqlServiceType}</mysqlServiceType>
             <nonmysqlServiceType>${cloudfoundry.nonmysqlServiceType}</nonmysqlServiceType>
             <servicePlan>${cloudfoundry.servicePlan}</servicePlan>
+            <project.version>${project.version}</project.version>
           </systemPropertyVariables>
         </configuration>
       </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <version>3.0.0</version>
+        <executions>
+          <execution>
+            <id>build-test-app-archives</id>
+            <phase>generate-test-resources</phase>
+            <goals>
+              <goal>single</goal>
+            </goals>
+            <configuration>
+              <descriptors>
+                <descriptor>src/test/assembly/hello-java.xml</descriptor>
+              </descriptors>
+              <outputDirectory>src/test/lib</outputDirectory>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
+
+    <testResources>
+      <testResource>
+        <directory>src/test/resources</directory>
+      </testResource>
+      <testResource>
+        <targetPath>com/hpe/cloudfoundryjenkins</targetPath>
+        <directory>src/test/lib</directory>
+      </testResource>
+    </testResources>
   </build>
 
 </project>

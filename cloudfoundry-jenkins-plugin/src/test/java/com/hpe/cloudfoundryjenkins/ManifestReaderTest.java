@@ -19,6 +19,8 @@ import static org.junit.Assert.assertTrue;
 
 public class ManifestReaderTest {
 
+    private static final String PROJECT_VERSION = System.getProperty("project.version");
+
     @Rule
     public ExpectedException exception = ExpectedException.none();
 
@@ -30,7 +32,7 @@ public class ManifestReaderTest {
         Map<String, Object> result = reader.getApplicationInfo();
         assertEquals("hello-java", result.get("name"));
         assertEquals("512M", result.get("memory"));
-        assertEquals("target/hello-java-1.0.war", result.get("path"));
+        assertEquals("hello-java-" + PROJECT_VERSION + ".war", result.get("path"));
     }
 
     @Test
@@ -41,7 +43,7 @@ public class ManifestReaderTest {
         Map<String, Object> result = reader.getApplicationInfo();
         assertEquals("hello-java", result.get("name"));
         assertEquals("512M", result.get("memory"));
-        assertEquals("target/hello-java-1.0.war", result.get("path"));
+        assertEquals("hello-java-" + PROJECT_VERSION + ".war", result.get("path"));
         @SuppressWarnings("unchecked")
         Map<String, String> envVars = (Map<String, String>) result.get("env");
         assertEquals("value1", envVars.get("ENV_VAR_ONE"));
@@ -57,7 +59,7 @@ public class ManifestReaderTest {
         Map<String, Object> result = reader.getApplicationInfo();
         assertEquals("hello-java", result.get("name"));
         assertEquals("512M", result.get("memory"));
-        assertEquals("target/hello-java-1.0.war", result.get("path"));
+        assertEquals("hello-java-" + PROJECT_VERSION + ".war", result.get("path"));
         @SuppressWarnings("unchecked")
         List<String> servicesNames = (List<String>) result.get("services");
         assertTrue(servicesNames.contains("service1"));
