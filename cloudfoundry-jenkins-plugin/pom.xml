@@ -1,0 +1,105 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.jenkins-ci.plugins</groupId>
+    <artifactId>cloudfoundry-parent</artifactId>
+    <version>2.0.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>cloudfoundry</artifactId>
+  <packaging>hpi</packaging>
+
+  <name>Cloud Foundry Plugin</name>
+<description>Pushes a project to Cloud Foundry or a CF-based platform (e.g. Stackato) at the end of a build.</description>
+
+  <properties>
+    <!--
+      The properties below are passed into the test execution as system
+      properties. Default values are specified here, corresponding to the
+      out-of-the-box values for PCF Dev.
+
+      They can be overridden via system properties in MAVEN_OPTS,
+      e.g. MAVEN_OPTS="-Dcloudfoundry.target=..."
+    -->
+    <cloudfoundry.target>api.local.pcfdev.io</cloudfoundry.target>
+    <cloudfoundry.username>user</cloudfoundry.username>
+    <cloudfoundry.password>pass</cloudfoundry.password>
+    <cloudfoundry.org>pcfdev-org</cloudfoundry.org>
+    <cloudfoundry.space>pcfdev-space</cloudfoundry.space>
+    <cloudfoundry.mysqlServiceType>p-mysql</cloudfoundry.mysqlServiceType>
+    <cloudfoundry.nonmysqlServiceType>local-volume</cloudfoundry.nonmysqlServiceType>
+    <cloudfoundry.servicePlan>512mb</cloudfoundry.servicePlan>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.cloudfoundry</groupId>
+      <artifactId>cloudfoundry-client</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.cloudfoundry</groupId>
+      <artifactId>cloudfoundry-client-reactor</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.cloudfoundry</groupId>
+      <artifactId>cloudfoundry-operations</artifactId>
+      <version>${cloudfoundry.client.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.projectreactor</groupId>
+      <artifactId>reactor-core</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>io.projectreactor.ipc</groupId>
+      <artifactId>reactor-netty</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.yaml</groupId>
+      <artifactId>snakeyaml</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.httpcomponents</groupId>
+      <artifactId>fluent-hc</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.jenkins-ci.plugins</groupId>
+      <artifactId>credentials</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.jenkins-ci.plugins</groupId>
+      <artifactId>token-macro</artifactId>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <systemPropertyVariables>
+            <target>${cloudfoundry.target}</target>
+            <username>${cloudfoundry.username}</username>
+            <password>${cloudfoundry.password}</password>
+            <org>${cloudfoundry.org}</org>
+            <space>${cloudfoundry.space}</space>
+            <mysqlServiceType>${cloudfoundry.mysqlServiceType}</mysqlServiceType>
+            <nonmysqlServiceType>${cloudfoundry.nonmysqlServiceType}</nonmysqlServiceType>
+            <servicePlan>${cloudfoundry.servicePlan}</servicePlan>
+          </systemPropertyVariables>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
+</project>
