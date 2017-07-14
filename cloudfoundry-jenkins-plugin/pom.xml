@@ -123,6 +123,7 @@
             <configuration>
               <descriptors>
                 <descriptor>src/test/assembly/hello-java.xml</descriptor>
+                <descriptor>src/test/assembly/hello-java-custom-manifest-location.xml</descriptor>
               </descriptors>
               <outputDirectory>src/test/lib</outputDirectory>
             </configuration>

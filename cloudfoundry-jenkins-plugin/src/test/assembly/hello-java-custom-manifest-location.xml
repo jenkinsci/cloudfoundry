@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/2.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.0.0 http://maven.apache.org/xsd/assembly-2.0.0.xsd">
+  <id>hello-java-custom-manifest-location</id>
+  <formats>
+    <format>zip</format>
+  </formats>
+  <includeBaseDirectory>false</includeBaseDirectory>
+  <dependencySets>
+    <dependencySet>
+      <includes>
+        <include>${project.groupId}:hello-java:war:${project.version}</include>
+      </includes>
+      <scope>test</scope>
+      <outputDirectory>target</outputDirectory>
+    </dependencySet>
+  </dependencySets>
+  <files>
+    <file>
+      <source>src/test/cloudfoundry/hello-java-manifest-custom-location.yml</source>
+      <filtered>true</filtered>
+      <outputDirectory>manifest</outputDirectory>
+      <destName>manifest.yml</destName>
+    </file>
+  </files>
+</assembly>

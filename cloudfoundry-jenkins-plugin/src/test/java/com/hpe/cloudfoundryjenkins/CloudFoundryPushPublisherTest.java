@@ -385,7 +385,7 @@ public class CloudFoundryPushPublisherTest {
     @Test
     public void testPerformCustomManifestFileLocation() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
-        project.setScm(new ExtractResourceSCM(getClass().getResource("hello-java-custom-manifest-location.zip")));
+        project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-java-custom-manifest-location.zip")));
 
         ManifestChoice manifestChoice = new ManifestChoice("manifestFile", "manifest/manifest.yml",
                 null, 0, null, 0, 0, false, null, null, null, null, null, null, null);
