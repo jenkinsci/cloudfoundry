@@ -289,7 +289,7 @@ public class CloudFoundryPushPublisherTest {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-java.zip")));
         ManifestChoice manifest =
-                new ManifestChoice("jenkinsConfig", null, "hello-java", 64, "", 4, 0, false,
+                new ManifestChoice("jenkinsConfig", null, "hello-java", 160, "", 4, 0, false,
                         "hello-java-" + PROJECT_VERSION + ".war", "", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
