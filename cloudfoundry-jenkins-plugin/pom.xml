@@ -133,6 +133,7 @@
                 <descriptor>src/test/assembly/hello-java.xml</descriptor>
                 <descriptor>src/test/assembly/hello-java-custom-manifest-location.xml</descriptor>
                 <descriptor>src/test/assembly/hello-spring-mysql.xml</descriptor>
+                <descriptor>src/test/assembly/multi-hello-java.xml</descriptor>
               </descriptors>
               <outputDirectory>src/test/lib</outputDirectory>
             </configuration>

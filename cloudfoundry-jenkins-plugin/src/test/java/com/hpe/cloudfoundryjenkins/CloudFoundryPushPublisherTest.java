@@ -348,7 +348,7 @@ public class CloudFoundryPushPublisherTest {
     @Test
     public void testPerformMultiAppManifest() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
-        project.setScm(new ExtractResourceSCM(getClass().getResource("multi-hello-java.zip")));
+        project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-multi-hello-java.zip")));
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
                 "testCredentialsId", true, false, 0, null, ManifestChoice.defaultManifestFileConfig());
         project.getPublishersList().add(cf);

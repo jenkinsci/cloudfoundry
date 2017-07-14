@@ -1,0 +1,8 @@
+---
+applications:
+- name: hello-java-1
+  memory: 200M
+  path: hello-java-1/hello-java-${project.version}.war
+- name: hello-java-2
+  memory: 300M
+  path: hello-java-2/hello-java-${project.version}.war
