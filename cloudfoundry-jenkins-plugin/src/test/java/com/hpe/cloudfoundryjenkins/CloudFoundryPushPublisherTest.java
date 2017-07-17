@@ -80,6 +80,7 @@ public class CloudFoundryPushPublisherTest {
     private static final String TEST_SPACE = System.getProperty("space");
     private static final String TEST_MYSQL_SERVICE_TYPE = System.getProperty("mysqlServiceType", "mysql");
     private static final String TEST_NONMYSQL_SERVICE_TYPE = System.getProperty("nonmysqlServiceType", "filesystem");
+    private static final String TEST_NONMYSQL_SERVICE_PLAN = System.getProperty("nonmysqlServicePlan", "free-local-disk");
     private static final String TEST_SERVICE_PLAN = System.getProperty("servicePlan", "free");
     private static final String PROJECT_VERSION = System.getProperty("project.version");
 
@@ -491,14 +492,14 @@ public class CloudFoundryPushPublisherTest {
     @Test
     public void testPerformServicesNamesManifestFile() throws Exception {
         cloudFoundryOperations.services().createInstance(CreateServiceInstanceRequest.builder()
-            .serviceName("mysql_service1")
-            .tag(TEST_MYSQL_SERVICE_TYPE)
+            .serviceInstanceName("mysql_service1")
+            .serviceName(TEST_MYSQL_SERVICE_TYPE)
             .planName(TEST_SERVICE_PLAN)
             .build()).block();
 
         cloudFoundryOperations.services().createInstance(CreateServiceInstanceRequest.builder()
-            .serviceName("mysql_service2")
-            .tag(TEST_MYSQL_SERVICE_TYPE)
+            .serviceInstanceName("mysql_service2")
+            .serviceName(TEST_MYSQL_SERVICE_TYPE)
             .planName(TEST_SERVICE_PLAN)
             .build()).block();
 
@@ -562,10 +563,10 @@ public class CloudFoundryPushPublisherTest {
     @Test
     public void testPerformResetService() throws Exception {
         cloudFoundryOperations.services().createInstance(CreateServiceInstanceRequest.builder()
-            .serviceName("mysql-spring")
+            .serviceInstanceName("mysql-spring")
             // Not the right type of service, must be reset for hello-mysql-spring to work
-            .tag(TEST_NONMYSQL_SERVICE_TYPE)
-            .planName(TEST_SERVICE_PLAN)
+            .serviceName(TEST_NONMYSQL_SERVICE_TYPE)
+            .planName(TEST_NONMYSQL_SERVICE_PLAN)
             .build()).block();
 
         FreeStyleProject project = j.createFreeStyleProject();
