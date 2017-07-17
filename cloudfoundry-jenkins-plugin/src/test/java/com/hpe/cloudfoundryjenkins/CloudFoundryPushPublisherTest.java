@@ -462,6 +462,7 @@ public class CloudFoundryPushPublisherTest {
     }
 
     @Test
+    //TODO fix race condition.
     public void testPerformEnvVarsManifestFile() throws Exception {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("python-env.zip")));

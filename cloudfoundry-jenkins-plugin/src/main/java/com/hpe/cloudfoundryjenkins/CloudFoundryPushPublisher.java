@@ -52,6 +52,7 @@ import org.cloudfoundry.doppler.LogMessage;
 import org.cloudfoundry.operations.CloudFoundryOperations;
 import org.cloudfoundry.operations.DefaultCloudFoundryOperations;
 import org.cloudfoundry.operations.applications.ApplicationDetail;
+import org.cloudfoundry.operations.applications.GetApplicationEnvironmentsRequest;
 import org.cloudfoundry.operations.applications.GetApplicationRequest;
 import org.cloudfoundry.operations.applications.LogsRequest;
 import org.cloudfoundry.operations.applications.PushApplicationRequest;
@@ -59,6 +60,7 @@ import org.cloudfoundry.operations.applications.RestartApplicationRequest;
 import org.cloudfoundry.operations.applications.ScaleApplicationRequest;
 import org.cloudfoundry.operations.applications.SetEnvironmentVariableApplicationRequest;
 import org.cloudfoundry.operations.applications.StartApplicationRequest;
+import org.cloudfoundry.operations.applications.UnsetEnvironmentVariableApplicationRequest;
 import org.cloudfoundry.operations.routes.ListRoutesRequest;
 import org.cloudfoundry.operations.routes.UnmapRouteRequest;
 import org.cloudfoundry.operations.services.BindServiceInstanceRequest;
@@ -383,6 +385,22 @@ public class CloudFoundryPushPublisher extends Recorder {
               .filter(serviceInstance -> deploymentInfo.getServicesNames().contains(serviceInstance.getName()))
               .map(serviceInstance -> BindServiceInstanceRequest.builder().applicationName(appName).serviceInstanceName(serviceInstance.getName()).build())
               .flatMap(request -> cloudFoundryOperations.services().bind(request))
+              .blockLast();
+        }
+
+        // Delete unused environment variables.
+        Map<String, Object> oldEnvVars = cloudFoundryOperations.applications().getEnvironments(GetApplicationEnvironmentsRequest.builder().name(appName).build())
+            .map(applicationEnvironments -> applicationEnvironments.getUserProvided()).block();
+        Flux.fromStream(oldEnvVars.keySet().stream().filter(key -> !deploymentInfo.getEnvVars().containsKey(key)))
+            .map(varName -> UnsetEnvironmentVariableApplicationRequest.builder().name(appName).variableName(varName).build())
+            .flatMap(request -> cloudFoundryOperations.applications().unsetEnvironmentVariable(request))
+            .blockLast();
+
+        // Set environment variables.
+        if (!deploymentInfo.getEnvVars().isEmpty()) {
+          Flux.fromIterable(deploymentInfo.getEnvVars().entrySet())
+              .map(entry -> SetEnvironmentVariableApplicationRequest.builder().name(appName).variableName(entry.getKey()).variableValue(entry.getValue()).build())
+              .flatMap(request -> cloudFoundryOperations.applications().setEnvironmentVariable(request))
               .blockLast();
         }
 
