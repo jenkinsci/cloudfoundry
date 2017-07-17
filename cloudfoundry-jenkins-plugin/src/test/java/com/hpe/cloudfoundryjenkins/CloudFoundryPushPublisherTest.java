@@ -640,7 +640,7 @@ public class CloudFoundryPushPublisherTest {
         System.out.println(s);
 
         assertTrue("Build succeeded where it should have failed", build.getResult().isWorseOrEqualTo(Result.FAILURE));
-        assertTrue("Build did not write error message", s.contains("ERROR: Unknown host"));
+        assertTrue("Build did not write error message", s.contains("java.net.UnknownHostException"));
     }
 
     @Test
