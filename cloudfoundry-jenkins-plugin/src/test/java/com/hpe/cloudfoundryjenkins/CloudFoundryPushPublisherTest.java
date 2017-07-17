@@ -45,11 +45,14 @@ import org.apache.http.conn.ssl.TrustSelfSignedStrategy;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.cloudfoundry.client.v2.applications.DeleteApplicationRequest;
+import org.cloudfoundry.client.v2.routes.DeleteRouteRequest;
 import org.cloudfoundry.client.v2.serviceinstances.DeleteServiceInstanceRequest;
 import org.cloudfoundry.doppler.DopplerClient;
 import org.cloudfoundry.operations.CloudFoundryOperations;
 import org.cloudfoundry.operations.DefaultCloudFoundryOperations;
 import org.cloudfoundry.operations.applications.GetApplicationRequest;
+import org.cloudfoundry.operations.routes.Level;
+import org.cloudfoundry.operations.routes.ListRoutesRequest;
 import org.cloudfoundry.operations.services.CreateServiceInstanceRequest;
 import org.cloudfoundry.reactor.ConnectionContext;
 import org.cloudfoundry.reactor.DefaultConnectionContext;
@@ -59,6 +62,7 @@ import org.cloudfoundry.reactor.doppler.ReactorDopplerClient;
 import org.cloudfoundry.reactor.tokenprovider.PasswordGrantTokenProvider;
 import org.cloudfoundry.reactor.uaa.ReactorUaaClient;
 import org.cloudfoundry.uaa.UaaClient;
+import org.junit.AfterClass;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -166,8 +170,14 @@ public class CloudFoundryPushPublisherTest {
       httpClient = HttpClients.custom().setSSLSocketFactory(sslsf).build();
     }
 
-    @Before
-    public void cleanCloudSpace() throws IOException {
+    @AfterClass
+    public static void cleanCloudSpace() throws IOException {
+        cloudFoundryOperations.routes()
+            .list(ListRoutesRequest.builder().level(Level.SPACE).build())
+            .map(route -> DeleteRouteRequest.builder().routeId(route.getId()).build())
+            .flatMap(request -> client.routes().delete(request))
+            .blockLast();
+
         cloudFoundryOperations.applications()
             .list()
             .map(application -> DeleteApplicationRequest.builder().applicationId(application.getId()).build())
@@ -179,8 +189,12 @@ public class CloudFoundryPushPublisherTest {
             .map(service -> DeleteServiceInstanceRequest.builder().serviceInstanceId(service.getId()).build())
             .flatMap(request -> client.serviceInstances().delete(request))
             .blockLast();
+    }
 
-        CredentialsStore store = CredentialsProvider.lookupStores(j.getInstance()).iterator().next();
+    @Before
+    public void setupCredentialsAndCleanCloudSpace() throws IOException {
+      cleanCloudSpace();
+      CredentialsStore store = CredentialsProvider.lookupStores(j.getInstance()).iterator().next();
         store.addCredentials(Domain.global(),
                 new UsernamePasswordCredentialsImpl(CredentialsScope.GLOBAL, "testCredentialsId", "",
                         TEST_USERNAME, TEST_PASSWORD));
