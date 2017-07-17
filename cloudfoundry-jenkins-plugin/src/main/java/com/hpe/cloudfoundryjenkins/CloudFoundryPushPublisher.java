@@ -44,7 +44,9 @@ import java.util.regex.Pattern;
 
 import org.cloudfoundry.client.CloudFoundryClient;
 import org.cloudfoundry.client.v2.ClientV2Exception;
+import org.cloudfoundry.client.v2.applications.CreateApplicationRequest;
 import org.cloudfoundry.client.v2.info.GetInfoRequest;
+import org.cloudfoundry.client.v2.spaces.ListSpacesRequest;
 import org.cloudfoundry.doppler.DopplerClient;
 import org.cloudfoundry.doppler.LogMessage;
 import org.cloudfoundry.operations.CloudFoundryOperations;
@@ -237,7 +239,7 @@ public class CloudFoundryPushPublisher extends Recorder {
 
             boolean success = true;
             for (DeploymentInfo deploymentInfo : allDeploymentInfo) {
-                boolean lastSuccess = processOneApp(cloudFoundryOperations, deploymentInfo, build, listener);
+                boolean lastSuccess = processOneApp(cloudFoundryOperations, deploymentInfo, build, listener, client);
                 // If an app fails, the build status is failure, but we should still try pushing them
                 success = success && lastSuccess;
             }
@@ -264,14 +266,14 @@ public class CloudFoundryPushPublisher extends Recorder {
     }
 
     private boolean processOneApp(CloudFoundryOperations cloudFoundryOperations, DeploymentInfo deploymentInfo, AbstractBuild build,
-                                  BuildListener listener) throws IOException, InterruptedException  {
+                                  BuildListener listener, CloudFoundryClient client) throws IOException, InterruptedException  {
         String appName = deploymentInfo.getAppName();
         String appURI = null;
 
         listener.getLogger().println("Pushing " + appName + " app to " + target);
 
         // Create app if it doesn't already exist, or if resetIfExists parameter is true
-        boolean createdNewApp = createApplicationIfNeeded(cloudFoundryOperations, listener, deploymentInfo, appName, build);
+        boolean createdNewApp = createApplicationIfNeeded(cloudFoundryOperations, listener, deploymentInfo, appName, build, client);
 
         // Unbind all routes if no-route parameter is set
         if (deploymentInfo.isNoRoute()) {
@@ -353,7 +355,7 @@ public class CloudFoundryPushPublisher extends Recorder {
     }
 
     private boolean createApplicationIfNeeded(CloudFoundryOperations cloudFoundryOperations, BuildListener listener,
-                                              DeploymentInfo deploymentInfo, String appName, AbstractBuild build) throws IOException, InterruptedException {
+                                              DeploymentInfo deploymentInfo, String appName, AbstractBuild build, CloudFoundryClient client) throws IOException, InterruptedException {
 
         // Check if app already exists
         boolean applicationExists = cloudFoundryOperations.applications().list()
@@ -361,6 +363,28 @@ public class CloudFoundryPushPublisher extends Recorder {
             .block();
 
         listener.getLogger().println(applicationExists ? "Updating existing app." : "Creating new app.");
+
+        // Create the app if it does not exist, so we can bind services to it.
+        if (!applicationExists) {
+          String spaceId = client.spaces().list(ListSpacesRequest.builder().name(this.cloudSpace).build())
+              .flatMapIterable(response -> response.getResources())
+              .map(space -> space.getMetadata().getId())
+              .blockFirst();
+
+          client.applicationsV2().create(CreateApplicationRequest.builder()
+              .name(appName)
+              .spaceId(spaceId)
+              .build()).block();
+        }
+
+        // Bind services to the app before we push it.
+        if (!deploymentInfo.getServicesNames().isEmpty()) {
+          cloudFoundryOperations.services().listInstances()
+              .filter(serviceInstance -> deploymentInfo.getServicesNames().contains(serviceInstance.getName()))
+              .map(serviceInstance -> BindServiceInstanceRequest.builder().applicationName(appName).serviceInstanceName(serviceInstance.getName()).build())
+              .flatMap(request -> cloudFoundryOperations.services().bind(request))
+              .blockLast();
+        }
 
         cloudFoundryOperations.applications().push(PushApplicationRequest.builder()
             .name(appName)
@@ -375,13 +399,6 @@ public class CloudFoundryPushPublisher extends Recorder {
             .path(Paths.get(new FilePath(build.getWorkspace(), deploymentInfo.getAppPath()).toURI()))
             .build()).block();
 
-        if (deploymentInfo.getServicesNames() != null && !deploymentInfo.getServicesNames().isEmpty()) {
-          listener.getLogger().println("Binding services to app.");
-          Flux.fromStream(deploymentInfo.getServicesNames().stream())
-              .map(serviceName -> BindServiceInstanceRequest.builder().applicationName(appName).serviceInstanceName(serviceName).build())
-              .flatMap(request -> cloudFoundryOperations.services().bind(request))
-              .blockLast();
-        }
         return !applicationExists;
     }
 
