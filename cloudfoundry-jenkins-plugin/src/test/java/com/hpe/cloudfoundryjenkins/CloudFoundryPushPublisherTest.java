@@ -663,6 +663,6 @@ public class CloudFoundryPushPublisherTest {
         System.out.println(s);
 
         assertTrue("Build succeeded where it should have failed", build.getResult().isWorseOrEqualTo(Result.FAILURE));
-        assertTrue("Build did not write error message", s.contains("ERROR: Wrong username or password"));
+        assertTrue("Build did not write error message", s.contains("unauthorized: Bad credentials"));
     }
 }
