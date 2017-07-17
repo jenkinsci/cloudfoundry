@@ -620,11 +620,7 @@ public class CloudFoundryPushPublisherTest {
         assertTrue("Build did not succeed", build.getResult().isBetterOrEqualTo(Result.SUCCESS));
         assertTrue("Build did not display staging logs", log.contains("Downloaded app package"));
 
-        System.out.println("App URI : " + cf.getAppURIs().get(0));
-        String uri = cf.getAppURIs().get(0);
-        HttpResponse response = httpClient.execute(new HttpGet(uri));
-        int statusCode = response.getStatusLine().getStatusCode();
-        assertEquals("Get request did not respond 404 Not Found", 404, statusCode);
+        assertTrue("App has a routable URI.", cf.getAppURIs().isEmpty());
     }
 
     @Test

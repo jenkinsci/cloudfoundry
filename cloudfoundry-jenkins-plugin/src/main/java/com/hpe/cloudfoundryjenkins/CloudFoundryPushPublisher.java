@@ -61,6 +61,7 @@ import org.cloudfoundry.operations.applications.ScaleApplicationRequest;
 import org.cloudfoundry.operations.applications.SetEnvironmentVariableApplicationRequest;
 import org.cloudfoundry.operations.applications.StartApplicationRequest;
 import org.cloudfoundry.operations.applications.UnsetEnvironmentVariableApplicationRequest;
+import org.cloudfoundry.operations.routes.Level;
 import org.cloudfoundry.operations.routes.ListRoutesRequest;
 import org.cloudfoundry.operations.routes.UnmapRouteRequest;
 import org.cloudfoundry.operations.services.BindServiceInstanceRequest;
@@ -279,9 +280,11 @@ public class CloudFoundryPushPublisher extends Recorder {
 
         // Unbind all routes if no-route parameter is set
         if (deploymentInfo.isNoRoute()) {
-            cloudFoundryOperations.routes().unmap(UnmapRouteRequest.builder()
-                .applicationName(appName)
-                .build()).block();
+            cloudFoundryOperations.routes().list(ListRoutesRequest.builder().level(Level.SPACE).build())
+                .filter(route -> route.getApplications().contains(appName))
+                .map(route -> UnmapRouteRequest.builder().applicationName(appName).domain(route.getDomain()).host(route.getHost()).path(route.getPath()).build())
+                .flatMap(request -> cloudFoundryOperations.routes().unmap(request))
+                .blockLast();
         } else {
           appURI = cloudFoundryOperations.routes().list(ListRoutesRequest.builder().build())
               .filter(route -> route.getApplications().contains(appName))
