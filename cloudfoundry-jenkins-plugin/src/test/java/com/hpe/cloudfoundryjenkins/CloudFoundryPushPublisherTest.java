@@ -456,9 +456,8 @@ public class CloudFoundryPushPublisherTest {
         System.out.println(log);
 
         assertTrue("Build succeeded where it should have failed", build.getResult().isWorseOrEqualTo(Result.FAILURE));
-        assertTrue("Build did not display staging logs", log.contains("Downloaded app package"));
         assertTrue("Build did not display proper error message",
-                log.contains("ERROR: The application failed to start after"));
+                log.contains("failed during start"));
     }
 
     @Test
