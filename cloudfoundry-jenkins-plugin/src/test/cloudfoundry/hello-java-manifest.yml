@@ -3,6 +3,3 @@ applications:
 - name: hello-java
   memory: 512M
   path: hello-java-${project.version}.war
-  # TODO remove this workaround
-  env:
-    VCAP_APP_HOST: 127.0.0.1
