@@ -255,7 +255,28 @@ public class CloudFoundryPushPublisher extends Recorder {
     }
 
     private static List<ApplicationManifest> manifestFile(AbstractBuild build, ManifestChoice manifestChoice) throws IOException, InterruptedException {
-      return ApplicationManifestUtils.read(Paths.get(new FilePath(build.getWorkspace(), manifestChoice.manifestFile).toURI()));
+      return ApplicationManifestUtils.read(Paths.get(new FilePath(build.getWorkspace(), manifestChoice.manifestFile).toURI()))
+          .stream()
+          .map(manifest -> fixManifest(build, manifest))
+          .collect(Collectors.toList());
+    }
+
+    /**
+     * Workarounds for any manifest issues should be added here.
+     * @param build the build
+     * @param manifest the manifest
+     * @return either the original manifest or a fixed-up version of the manifest
+     */
+    private static ApplicationManifest fixManifest(final AbstractBuild build, final ApplicationManifest manifest) {
+      if (manifest.getPath()==null && StringUtils.isEmpty(manifest.getDockerImage())) {
+        try {
+          return ApplicationManifest.builder().from(manifest).path(Paths.get(build.getWorkspace().toURI())).build();
+        } catch(IOException | InterruptedException e) {
+          throw new RuntimeException(e);
+        }
+      } else {
+        return manifest;
+      }
     }
 
     private static List<ApplicationManifest> jenkinsConfig(AbstractBuild build, ManifestChoice manifestChoice) throws IOException, InterruptedException {
