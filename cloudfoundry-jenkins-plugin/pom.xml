@@ -30,6 +30,7 @@
     <cloudfoundry.mysqlServiceType>p-mysql</cloudfoundry.mysqlServiceType>
     <cloudfoundry.nonmysqlServiceType>local-volume</cloudfoundry.nonmysqlServiceType>
     <cloudfoundry.servicePlan>512mb</cloudfoundry.servicePlan>
+    <jenkins.test.timeout>300</jenkins.test.timeout>
   </properties>
 
   <dependencies>
@@ -113,6 +114,7 @@
             <nonmysqlServiceType>${cloudfoundry.nonmysqlServiceType}</nonmysqlServiceType>
             <servicePlan>${cloudfoundry.servicePlan}</servicePlan>
             <project.version>${project.version}</project.version>
+            <jenkins.test.timeout>${jenkins.test.timeout}</jenkins.test.timeout>
           </systemPropertyVariables>
         </configuration>
       </plugin>
