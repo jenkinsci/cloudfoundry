@@ -35,6 +35,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -211,10 +212,12 @@ public class CloudFoundryPushPublisher extends Recorder {
             List<ApplicationManifest> manifests = toManifests(build, manifestChoice);
             for(final ApplicationManifest manifest : manifests) {
               cloudFoundryOperations.applications().pushManifest(PushApplicationManifestRequest.builder().manifest(manifest).build())
+                  .timeout(Duration.ofSeconds(pluginTimeout))
                   .doOnError(e -> e.printStackTrace(listener.getLogger()))
                   .block();
               if (manifest.getNoRoute() == null || !manifest.getNoRoute().booleanValue()) {
                 cloudFoundryOperations.routes().list(ListRoutesRequest.builder().build())
+                  .timeout(Duration.ofSeconds(pluginTimeout))
                   .filter(route -> route.getApplications().contains(manifest.getName()))
                   .map(route -> new StringBuilder("https://").append(route.getHost()).append(".").append(route.getDomain()).append(route.getPath()))
                   .map(StringBuilder::toString)
@@ -276,6 +279,7 @@ public class CloudFoundryPushPublisher extends Recorder {
     private void printStagingLogs(CloudFoundryOperations cloudFoundryOperations,
                                   final BuildListener listener, String appName) {
       cloudFoundryOperations.applications().logs(LogsRequest.builder().name(appName).recent(Boolean.TRUE).build())
+        .timeout(Duration.ofSeconds(pluginTimeout))
         .doOnNext(applicationLog -> listener.getLogger().println(applicationLog.getMessage()))
         .blockLast();
 
@@ -495,7 +499,9 @@ public class CloudFoundryPushPublisher extends Recorder {
                     .tokenProvider(tokenProvider)
                     .build();
 
-                client.info().get(GetInfoRequest.builder().build()).block();
+                client.info().get(GetInfoRequest.builder().build())
+                    .timeout(Duration.ofSeconds(DEFAULT_PLUGIN_TIMEOUT))
+                    .block();
                 if (targetUrl.getHost().startsWith("api.")) {
                     return FormValidation.okWithMarkup("<b>Connection successful!</b>");
                 } else {
