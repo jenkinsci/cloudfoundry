@@ -8,6 +8,7 @@
 	<servlet>
 		<servlet-name>HelloServlet</servlet-name>
 		<servlet-class>org.cloudfoundry.samples.HelloServlet</servlet-class>
+                                        <load-on-startup>1</load-on-startup>
 	</servlet>
 
 	<servlet-mapping>
