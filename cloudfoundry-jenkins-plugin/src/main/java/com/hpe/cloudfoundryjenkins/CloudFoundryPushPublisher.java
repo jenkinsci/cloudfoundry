@@ -25,7 +25,6 @@ import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
 import hudson.util.Secret;
 
-import org.jenkinsci.plugins.tokenmacro.MacroEvaluationException;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
@@ -37,33 +36,25 @@ import java.net.URL;
 import java.net.UnknownHostException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang.StringUtils;
 
 import org.cloudfoundry.client.CloudFoundryClient;
 import org.cloudfoundry.client.v2.ClientV2Exception;
-import org.cloudfoundry.client.v2.applications.CreateApplicationRequest;
 import org.cloudfoundry.client.v2.info.GetInfoRequest;
-import org.cloudfoundry.client.v2.spaces.ListSpacesRequest;
 import org.cloudfoundry.doppler.DopplerClient;
 import org.cloudfoundry.operations.CloudFoundryOperations;
 import org.cloudfoundry.operations.DefaultCloudFoundryOperations;
-import org.cloudfoundry.operations.applications.ApplicationDetail;
-import org.cloudfoundry.operations.applications.GetApplicationEnvironmentsRequest;
-import org.cloudfoundry.operations.applications.GetApplicationRequest;
+import org.cloudfoundry.operations.applications.ApplicationManifest;
+import org.cloudfoundry.operations.applications.ApplicationManifestUtils;
 import org.cloudfoundry.operations.applications.LogsRequest;
-import org.cloudfoundry.operations.applications.PushApplicationRequest;
-import org.cloudfoundry.operations.applications.RestartApplicationRequest;
-import org.cloudfoundry.operations.applications.ScaleApplicationRequest;
-import org.cloudfoundry.operations.applications.SetEnvironmentVariableApplicationRequest;
-import org.cloudfoundry.operations.applications.StartApplicationRequest;
-import org.cloudfoundry.operations.applications.UnsetEnvironmentVariableApplicationRequest;
-import org.cloudfoundry.operations.routes.Level;
+import org.cloudfoundry.operations.applications.PushApplicationManifestRequest;
 import org.cloudfoundry.operations.routes.ListRoutesRequest;
-import org.cloudfoundry.operations.routes.UnmapRouteRequest;
-import org.cloudfoundry.operations.services.BindServiceInstanceRequest;
 import org.cloudfoundry.operations.services.CreateServiceInstanceRequest;
 import org.cloudfoundry.operations.services.DeleteServiceInstanceRequest;
 import org.cloudfoundry.operations.services.ServiceInstanceSummary;
@@ -191,8 +182,6 @@ public class CloudFoundryPushPublisher extends Recorder {
                 .space(cloudSpace)
                 .build();
 
-            String domain = cloudFoundryOperations.domains().list().blockFirst().getName();
-
             // Create services before push
             Flux<ServiceInstanceSummary> currentServicesList = cloudFoundryOperations.services().listInstances();
             List<String> currentServicesNames = currentServicesList.map(service -> service.getName()).collectList().block();
@@ -219,40 +208,25 @@ public class CloudFoundryPushPublisher extends Recorder {
                 }
             }
 
-            // Get all deployment info
-            List<DeploymentInfo> allDeploymentInfo = new ArrayList<DeploymentInfo>();
-            if (manifestChoice.value.equals("manifestFile")) {
-                // Read manifest file
-                FilePath manifestFilePath = new FilePath(build.getWorkspace(), manifestChoice.manifestFile);
-                ManifestReader manifestReader = new ManifestReader(manifestFilePath);
-                List<Map<String, Object>> appList = manifestReader.getApplicationList();
-                for (Map<String, Object> appInfo : appList) {
-                    allDeploymentInfo.add(
-                            new DeploymentInfo(build, listener, listener.getLogger(),
-                                    appInfo, jenkinsBuildName, domain, manifestChoice.manifestFile));
-                }
-            } else {
-                // Read Jenkins configuration
-                allDeploymentInfo.add(
-                        new DeploymentInfo(build, listener, listener.getLogger(),
-                                manifestChoice, jenkinsBuildName, domain));
+            List<ApplicationManifest> manifests = toManifests(build, manifestChoice);
+            for(final ApplicationManifest manifest : manifests) {
+              cloudFoundryOperations.applications().pushManifest(PushApplicationManifestRequest.builder().manifest(manifest).build())
+                  .doOnError(e -> e.printStackTrace(listener.getLogger()))
+                  .block();
+              if (manifest.getNoRoute() == null || !manifest.getNoRoute().booleanValue()) {
+                cloudFoundryOperations.routes().list(ListRoutesRequest.builder().build())
+                  .filter(route -> route.getApplications().contains(manifest.getName()))
+                  .map(route -> new StringBuilder("https://").append(route.getHost()).append(".").append(route.getDomain()).append(route.getPath()))
+                  .map(StringBuilder::toString)
+                  .doOnNext(this::addToAppURIs)
+                  .blockLast();
+              }
+              printStagingLogs(cloudFoundryOperations, listener, manifest.getName());
             }
 
-            boolean success = true;
-            for (DeploymentInfo deploymentInfo : allDeploymentInfo) {
-                boolean lastSuccess = processOneApp(cloudFoundryOperations, deploymentInfo, build, listener, client);
-                // If an app fails, the build status is failure, but we should still try pushing them
-                success = success && lastSuccess;
-            }
-            return success;
+            return true;
         } catch (MalformedURLException e) {
             listener.getLogger().println("ERROR: The target URL is not valid: " + e.getMessage());
-            return false;
-        } catch (ManifestParsingException e) {
-            listener.getLogger().println("ERROR: Could not parse manifest: " + e.getMessage());
-            return false;
-        } catch (MacroEvaluationException e) {
-            listener.getLogger().println("ERROR: Could not parse token macro: " + e.getMessage());
             return false;
         } catch (IOException e) {
             listener.getLogger().println("ERROR: IOException: " + e.getMessage());
@@ -266,159 +240,37 @@ public class CloudFoundryPushPublisher extends Recorder {
         }
     }
 
-    private boolean processOneApp(CloudFoundryOperations cloudFoundryOperations, DeploymentInfo deploymentInfo, AbstractBuild build,
-                                  BuildListener listener, CloudFoundryClient client) throws IOException, InterruptedException  {
-        String appName = deploymentInfo.getAppName();
-        String appURI = null;
-
-        listener.getLogger().println("Pushing " + appName + " app to " + target);
-
-        // Create app if it doesn't already exist, or if resetIfExists parameter is true
-        boolean createdNewApp = createApplicationIfNeeded(cloudFoundryOperations, listener, deploymentInfo, appName, build, client);
-
-        // Unbind all routes if no-route parameter is set
-        if (deploymentInfo.isNoRoute()) {
-            cloudFoundryOperations.routes().list(ListRoutesRequest.builder().level(Level.SPACE).build())
-                .filter(route -> route.getApplications().contains(appName))
-                .map(route -> UnmapRouteRequest.builder().applicationName(appName).domain(route.getDomain()).host(route.getHost()).path(route.getPath()).build())
-                .flatMap(request -> cloudFoundryOperations.routes().unmap(request))
-                .blockLast();
-        } else {
-          appURI = cloudFoundryOperations.routes().list(ListRoutesRequest.builder().build())
-              .filter(route -> route.getApplications().contains(appName))
-              .map(route -> new StringBuilder("https://").append(route.getHost()).append(".").append(route.getDomain()).append(route.getPath()))
-              .map(sb -> sb.toString())
-              .blockFirst();
-          if (appURI != null) {
-            addToAppURIs(appURI);
-          }
-        }
-
-        // Add environment variables
-        if (!deploymentInfo.getEnvVars().isEmpty()) {
-            Flux.fromStream(deploymentInfo.getEnvVars().entrySet().stream())
-                .map(e -> SetEnvironmentVariableApplicationRequest.builder().name(appName).variableName(e.getKey()).variableValue(e.getValue()).build())
-                .map(request -> cloudFoundryOperations.applications().setEnvironmentVariable(request))
-                .blockLast();
-        }
-
-        // Change number of instances
-        if (deploymentInfo.getInstances() > 1) {
-          cloudFoundryOperations.applications().scale(ScaleApplicationRequest.builder().name(appName).instances(deploymentInfo.getInstances()).build()).block();
-        }
-
-        // Start or restart application
-        if (createdNewApp) {
-            listener.getLogger().println("Starting application.");
-            cloudFoundryOperations.applications().start(StartApplicationRequest.builder().name(appName).build()).block();
-        } else {
-            listener.getLogger().println("Restarting application.");
-            cloudFoundryOperations.applications().restart(RestartApplicationRequest.builder().name(appName).build()).block();
-        }
-
-        // Start printing the staging logs
-        printStagingLogs(cloudFoundryOperations, listener, appName);
-
-        // Keep checking to see if the app is running
-        int running = 0;
-        int totalInstances = 0;
-        for (int tries = 0; tries < pluginTimeout; tries++) {
-            running = 0;
-            ApplicationDetail app = cloudFoundryOperations.applications().get(GetApplicationRequest.builder().name(appName).build()).block();
-            totalInstances = app.getInstances();
-            running = app.getRunningInstances();
-            if (running == totalInstances && totalInstances > 0) {
-                break;
-            }
-            Thread.sleep(1000);
-        }
-
-        String instanceGrammar = "instances";
-        if (running == 1)
-            instanceGrammar = "instance";
-        listener.getLogger().println(running + " " + instanceGrammar + " running out of " + totalInstances);
-
-        if (running > 0) {
-            if (running != totalInstances) {
-                listener.getLogger().println("WARNING: Some instances of the application are not running.");
-            }
-            if (deploymentInfo.isNoRoute()) {
-                listener.getLogger().println("Application is now running. (No route)");
-            } else {
-                listener.getLogger().println("Application is now running at " + appURI);
-            }
-            listener.getLogger().println("Cloud Foundry push successful.");
-            return true;
-        } else {
-            listener.getLogger().println(
-                    "ERROR: The application failed to start after " + pluginTimeout + " seconds.");
-            listener.getLogger().println("Cloud Foundry push failed.");
-            return false;
-        }
+    private static List<ApplicationManifest> toManifests(AbstractBuild build, ManifestChoice manifestChoice) throws IOException, InterruptedException {
+      switch(manifestChoice.value) {
+        case "manifestFile":
+          return manifestFile(build, manifestChoice);
+        case "jenkinsConfig":
+          return jenkinsConfig(build, manifestChoice);
+        default:
+          throw new IllegalArgumentException("manifest choice must be either 'manifestFile' or 'jenkinsConfig', but was " + manifestChoice.value);
+      }
     }
 
-    private boolean createApplicationIfNeeded(CloudFoundryOperations cloudFoundryOperations, BuildListener listener,
-                                              DeploymentInfo deploymentInfo, String appName, AbstractBuild build, CloudFoundryClient client) throws IOException, InterruptedException {
+    private static List<ApplicationManifest> manifestFile(AbstractBuild build, ManifestChoice manifestChoice) throws IOException, InterruptedException {
+      return ApplicationManifestUtils.read(Paths.get(new FilePath(build.getWorkspace(), manifestChoice.manifestFile).toURI()));
+    }
 
-        // Check if app already exists
-        boolean applicationExists = cloudFoundryOperations.applications().list()
-            .any(app -> app.getName().equals(appName))
-            .block();
-
-        listener.getLogger().println(applicationExists ? "Updating existing app." : "Creating new app.");
-
-        // Create the app if it does not exist, so we can bind services to it.
-        if (!applicationExists) {
-          String spaceId = client.spaces().list(ListSpacesRequest.builder().name(this.cloudSpace).build())
-              .flatMapIterable(response -> response.getResources())
-              .map(space -> space.getMetadata().getId())
-              .blockFirst();
-
-          client.applicationsV2().create(CreateApplicationRequest.builder()
-              .name(appName)
-              .spaceId(spaceId)
-              .build()).block();
-        }
-
-        // Bind services to the app before we push it.
-        if (!deploymentInfo.getServicesNames().isEmpty()) {
-          cloudFoundryOperations.services().listInstances()
-              .filter(serviceInstance -> deploymentInfo.getServicesNames().contains(serviceInstance.getName()))
-              .map(serviceInstance -> BindServiceInstanceRequest.builder().applicationName(appName).serviceInstanceName(serviceInstance.getName()).build())
-              .flatMap(request -> cloudFoundryOperations.services().bind(request))
-              .blockLast();
-        }
-
-        // Delete unused environment variables.
-        Map<String, Object> oldEnvVars = cloudFoundryOperations.applications().getEnvironments(GetApplicationEnvironmentsRequest.builder().name(appName).build())
-            .map(applicationEnvironments -> applicationEnvironments.getUserProvided()).block();
-        Flux.fromStream(oldEnvVars.keySet().stream().filter(key -> !deploymentInfo.getEnvVars().containsKey(key)))
-            .map(varName -> UnsetEnvironmentVariableApplicationRequest.builder().name(appName).variableName(varName).build())
-            .flatMap(request -> cloudFoundryOperations.applications().unsetEnvironmentVariable(request))
-            .blockLast();
-
-        // Set environment variables.
-        if (!deploymentInfo.getEnvVars().isEmpty()) {
-          Flux.fromIterable(deploymentInfo.getEnvVars().entrySet())
-              .map(entry -> SetEnvironmentVariableApplicationRequest.builder().name(appName).variableName(entry.getKey()).variableValue(entry.getValue()).build())
-              .flatMap(request -> cloudFoundryOperations.applications().setEnvironmentVariable(request))
-              .blockLast();
-        }
-
-        cloudFoundryOperations.applications().push(PushApplicationRequest.builder()
-            .name(appName)
-            .command(deploymentInfo.getCommand())
-            .buildpack(deploymentInfo.getBuildpack())
-            .stack(deploymentInfo.getStack())
-            .timeout(deploymentInfo.getTimeout())
-            .memory(deploymentInfo.getMemory())
-            .noRoute(deploymentInfo.isNoRoute())
-            .routePath(null) // TODO add routePath to DeploymentInfo
-            .randomRoute(!deploymentInfo.isNoRoute()) // TODO add randomRoute to DeploymentInfo
-            .path(Paths.get(new FilePath(build.getWorkspace(), deploymentInfo.getAppPath()).toURI()))
-            .build()).block();
-
-        return !applicationExists;
+    private static List<ApplicationManifest> jenkinsConfig(AbstractBuild build, ManifestChoice manifestChoice) throws IOException, InterruptedException {
+      ApplicationManifest.Builder manifestBuilder = ApplicationManifest.builder();
+      manifestBuilder = !StringUtils.isBlank(manifestChoice.appName) ? manifestBuilder.name(manifestChoice.appName) : manifestBuilder;
+      manifestBuilder = !StringUtils.isBlank(manifestChoice.appPath) ? manifestBuilder.path(Paths.get(Paths.get(build.getWorkspace().toURI()).toString(), manifestChoice.appPath)) : manifestBuilder;
+      manifestBuilder = !StringUtils.isBlank(manifestChoice.buildpack) ? manifestBuilder.buildpack(manifestChoice.buildpack) : manifestBuilder;
+      manifestBuilder = !StringUtils.isBlank(manifestChoice.command) ? manifestBuilder.command(manifestChoice.command) : manifestBuilder;
+      manifestBuilder = !StringUtils.isBlank(manifestChoice.domain) ? manifestBuilder.domain(manifestChoice.domain) : manifestBuilder;
+      manifestBuilder = !CollectionUtils.isEmpty(manifestChoice.envVars) ? manifestBuilder.environmentVariables(manifestChoice.envVars.stream().collect(Collectors.toMap(envVar -> envVar.key, envVar -> envVar.value))) : manifestBuilder;
+      manifestBuilder = !StringUtils.isBlank(manifestChoice.hostname) ? manifestBuilder.host(manifestChoice.hostname) : manifestBuilder;
+      manifestBuilder = manifestChoice.instances > 0 ? manifestBuilder.instances(manifestChoice.instances) : manifestBuilder;
+      manifestBuilder = manifestChoice.memory > 0 ? manifestBuilder.memory(manifestChoice.memory) : manifestBuilder;
+      manifestBuilder = manifestBuilder.noRoute(manifestChoice.noRoute);
+      manifestBuilder = !CollectionUtils.isEmpty(manifestChoice.servicesNames) ? manifestBuilder.services(manifestChoice.servicesNames.stream().map(serviceName -> serviceName.name).collect(Collectors.toList())) : manifestBuilder;
+      manifestBuilder = !StringUtils.isBlank(manifestChoice.stack) ? manifestBuilder.stack(manifestChoice.stack) : manifestBuilder;
+      manifestBuilder = manifestChoice.timeout > 0 ? manifestBuilder.timeout(manifestChoice.timeout) : manifestBuilder;
+      return Collections.singletonList(manifestBuilder.build());
     }
 
     private void printStagingLogs(CloudFoundryOperations cloudFoundryOperations,
