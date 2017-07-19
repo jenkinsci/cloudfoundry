@@ -282,7 +282,7 @@ public class CloudFoundryPushPublisher extends Recorder {
     private static List<ApplicationManifest> jenkinsConfig(AbstractBuild build, ManifestChoice manifestChoice) throws IOException, InterruptedException {
       ApplicationManifest.Builder manifestBuilder = ApplicationManifest.builder();
       manifestBuilder = !StringUtils.isBlank(manifestChoice.appName) ? manifestBuilder.name(manifestChoice.appName) : manifestBuilder;
-      manifestBuilder = !StringUtils.isBlank(manifestChoice.appPath) ? manifestBuilder.path(Paths.get(Paths.get(build.getWorkspace().toURI()).toString(), manifestChoice.appPath)) : manifestBuilder;
+      manifestBuilder = !StringUtils.isBlank(manifestChoice.appPath) ? manifestBuilder.path(Paths.get(Paths.get(build.getWorkspace().toURI()).toString(), manifestChoice.appPath)) : manifestBuilder.path(Paths.get(build.getWorkspace().toURI()));
       manifestBuilder = !StringUtils.isBlank(manifestChoice.buildpack) ? manifestBuilder.buildpack(manifestChoice.buildpack) : manifestBuilder;
       manifestBuilder = !StringUtils.isBlank(manifestChoice.command) ? manifestBuilder.command(manifestChoice.command) : manifestBuilder;
       manifestBuilder = !StringUtils.isBlank(manifestChoice.domain) ? manifestBuilder.domain(manifestChoice.domain) : manifestBuilder;
