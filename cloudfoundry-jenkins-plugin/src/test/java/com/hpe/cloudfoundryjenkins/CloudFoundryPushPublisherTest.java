@@ -326,7 +326,7 @@ public class CloudFoundryPushPublisherTest {
 
         assertTrue("Build did not succeed", build.getResult().isBetterOrEqualTo(Result.SUCCESS));
         assertTrue("Build did not display staging logs", log.contains("Downloaded app package"));
-        assertTrue("Not the correct amount of instances", log.contains("4 instances running out of 4"));
+        assertTrue("Not the correct amount of instances", cloudFoundryOperations.applications().get(GetApplicationRequest.builder().name("hello-java").build()).block().getRunningInstances().equals(4));
 
         System.out.println("App URI : " + cf.getAppURIs().get(0));
         String uri = cf.getAppURIs().get(0);
