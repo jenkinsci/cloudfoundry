@@ -48,7 +48,6 @@ import org.cloudfoundry.client.v2.applications.CreateApplicationRequest;
 import org.cloudfoundry.client.v2.info.GetInfoRequest;
 import org.cloudfoundry.client.v2.spaces.ListSpacesRequest;
 import org.cloudfoundry.doppler.DopplerClient;
-import org.cloudfoundry.doppler.LogMessage;
 import org.cloudfoundry.operations.CloudFoundryOperations;
 import org.cloudfoundry.operations.DefaultCloudFoundryOperations;
 import org.cloudfoundry.operations.applications.ApplicationDetail;
@@ -77,7 +76,6 @@ import org.cloudfoundry.reactor.tokenprovider.PasswordGrantTokenProvider;
 import org.cloudfoundry.reactor.uaa.ReactorUaaClient;
 import org.cloudfoundry.uaa.UaaClient;
 
-import reactor.core.publisher.BaseSubscriber;
 import reactor.core.publisher.Flux;
 
 public class CloudFoundryPushPublisher extends Recorder {
@@ -425,24 +423,10 @@ public class CloudFoundryPushPublisher extends Recorder {
 
     private void printStagingLogs(CloudFoundryOperations cloudFoundryOperations,
                                   final BuildListener listener, String appName) {
-       cloudFoundryOperations.applications().logs(LogsRequest.builder().name(appName).recent(Boolean.TRUE).build())
-                .filter(logMessage -> logMessage.getSourceType().startsWith("STG") || logMessage.getSourceType().startsWith("CELL"))
-           .subscribeWith(new BaseSubscriber<LogMessage>(){
-          @Override
-          protected void hookOnNext(LogMessage applicationLog) {
-            /*
-             * We are only interested in the staging logs, and per
-             * https://docs.cloudfoundry.org/devguide/deploy-apps/streaming-logs.html#stg
-             * "After the droplet has been uploaded, STG messages end and CELL messages begin",
-             * so once we see the first CELL message we know we're done with the STG ones.
-             */
-            if (applicationLog.getSourceType().startsWith("STG")) {
-              listener.getLogger().println(applicationLog.getMessage());
-            } else if (applicationLog.getSourceType().startsWith("CELL")) {
-              onComplete();
-            }
-          }
-        });
+      cloudFoundryOperations.applications().logs(LogsRequest.builder().name(appName).recent(Boolean.TRUE).build())
+        .doOnNext(applicationLog -> listener.getLogger().println(applicationLog.getMessage()))
+        .blockLast();
+
     }
 
     private static Optional<org.cloudfoundry.reactor.ProxyConfiguration> buildProxyConfiguration(URL targetURL) {
