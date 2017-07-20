@@ -314,7 +314,10 @@ public class CloudFoundryPushPublisher extends Recorder {
     }
 
     private static Optional<org.cloudfoundry.reactor.ProxyConfiguration> buildProxyConfiguration(URL targetURL) {
-        ProxyConfiguration proxyConfig = Hudson.getInstance().proxy;
+        Hudson hudson = Hudson.getInstance();
+        if (hudson == null) return Optional.empty();
+
+        ProxyConfiguration proxyConfig = hudson.proxy;
         if (proxyConfig == null) {
             return Optional.empty();
         }
