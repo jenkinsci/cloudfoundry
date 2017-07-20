@@ -7,13 +7,15 @@
       <name>William Gautier</name>
       <email>william.gautier@hpe.com</email>
     </developer>
-    <developer>
-      <id>sworisbreathing</id>
+  </developers>
+
+  <contributors>
+    <contributor>
       <name>Steven Swor</name>
       <email>sworisbreathing@users.noreply.github.com</email>
       <url>https://github.com/sworisbreathing</url>
-    </developer>
-  </developers>
+    </contributor>
+  </contributors>
 
   <parent>
     <groupId>org.jenkins-ci.plugins</groupId>
