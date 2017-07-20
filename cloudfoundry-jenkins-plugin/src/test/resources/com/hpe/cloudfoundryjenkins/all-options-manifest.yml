@@ -16,9 +16,6 @@ applications:
     ENV_VAR_TWO: value2
     ENV_VAR_THREE: value3
 
-    #TODO remove this workaround
-    VCAP_APP_HOST: 127.0.0.1
-
   services:
   - service_name_one
   - service_name_two

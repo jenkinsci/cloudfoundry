@@ -7,6 +7,3 @@ applications:
     ENV_VAR_ONE: value1
     ENV_VAR_TWO: value2
     ENV_VAR_THREE: value3
-
-    #TODO remove this workaround
-    VCAP_APP_HOST: 127.0.0.1
