@@ -520,10 +520,12 @@ public class CloudFoundryPushPublisher extends Recorder {
                     .skipSslValidation(selfSigned)
                     .build();
 
-                TokenProvider tokenProvider = PasswordGrantTokenProvider.builder()
-                    .username(credentials.getUsername())
-                    .password(Secret.toString(credentials.getPassword()))
-                    .build();
+                PasswordGrantTokenProvider.Builder tokenProviderBuilder = PasswordGrantTokenProvider.builder();
+                if (credentials != null) {
+                  tokenProviderBuilder = tokenProviderBuilder.username(credentials.getUsername())
+                    .password(Secret.toString(credentials.getPassword()));
+                }
+                TokenProvider tokenProvider = tokenProviderBuilder.build();
 
                 CloudFoundryClient client = ReactorCloudFoundryClient.builder()
                     .connectionContext(connectionContext)
