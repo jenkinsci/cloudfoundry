@@ -298,15 +298,15 @@ public class DeploymentInfo {
         this.domain = TokenMacro.expandAll(build, listener, this.domain);
 
         Map<String, String> expandedEnvVars = new HashMap<String, String>();
-        for (String envVarName : this.envVars.keySet()) {
+        for (Map.Entry<String, String> entry : this.envVars.entrySet()) {
             try {
-                String expandedEnvVarName = TokenMacro.expandAll(build, listener, envVarName);
-                String expandedEnvVarValue = TokenMacro.expandAll(build, listener, this.envVars.get(envVarName));
+                String expandedEnvVarName = TokenMacro.expandAll(build, listener, entry.getKey());
+                String expandedEnvVarValue = TokenMacro.expandAll(build, listener, entry.getValue());
                 expandedEnvVars.put(expandedEnvVarName, expandedEnvVarValue);
             } catch (MacroEvaluationException e) {
                 // If a token exists but isn't recognized, then it's probably an environment variable
                 // meant for the CF target, so leave it alone.
-                expandedEnvVars.put(envVarName, this.envVars.get(envVarName));
+                expandedEnvVars.put(entry.getKey(), entry.getValue());
             }
         }
         this.envVars = expandedEnvVars;
