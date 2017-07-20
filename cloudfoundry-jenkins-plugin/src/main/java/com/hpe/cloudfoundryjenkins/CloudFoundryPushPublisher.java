@@ -269,9 +269,10 @@ public class CloudFoundryPushPublisher extends Recorder {
      * @return either the original manifest or a fixed-up version of the manifest
      */
     private static ApplicationManifest fixManifest(final AbstractBuild build, final ApplicationManifest manifest) {
-      if (manifest.getPath()==null && StringUtils.isEmpty(manifest.getDockerImage())) {
+      FilePath workspace = build.getWorkspace();
+      if (workspace != null && manifest.getPath()==null && StringUtils.isEmpty(manifest.getDockerImage())) {
         try {
-          return ApplicationManifest.builder().from(manifest).path(Paths.get(build.getWorkspace().toURI())).build();
+          return ApplicationManifest.builder().from(manifest).path(Paths.get(workspace.toURI())).build();
         } catch(IOException | InterruptedException e) {
           throw new RuntimeException(e);
         }
