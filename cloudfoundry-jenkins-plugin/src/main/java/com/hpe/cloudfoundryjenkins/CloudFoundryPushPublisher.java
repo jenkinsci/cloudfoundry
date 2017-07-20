@@ -554,7 +554,7 @@ public class CloudFoundryPushPublisher extends Recorder {
         public FormValidation doCheckTarget(@QueryParameter String value) {
             if (!value.isEmpty()) {
                 try {
-                    URL targetUrl = new URL("https://" + value);
+                    new URL("https://" + value);
                 } catch (MalformedURLException e) {
                     return FormValidation.error("Malformed URL");
                 }
