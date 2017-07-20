@@ -634,4 +634,8 @@ public class CloudFoundryPushPublisher extends Recorder {
         }
         return this;
     }
+
+    public boolean isResetIfExists() {
+        return resetIfExists;
+    }
 }
