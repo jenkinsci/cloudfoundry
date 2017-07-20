@@ -49,7 +49,7 @@ public class DeploymentInfoTest {
         assertEquals(42, deploymentInfo.getTimeout());
         assertEquals(true, deploymentInfo.isNoRoute());
         assertEquals("testdomain.local", deploymentInfo.getDomain());
-        assertEquals("target" + File.separator + "hello-java-" + PROJECT_VERSION + ".war", deploymentInfo.getAppPath());
+        assertEquals("target" + File.separator + "hello-java-1.0.war", deploymentInfo.getAppPath());
         assertEquals("https://github.com/heroku/heroku-buildpack-hello", deploymentInfo.getBuildpack());
         assertEquals("customstack", deploymentInfo.getStack());
         assertEquals("echo Hello", deploymentInfo.getCommand());
@@ -152,7 +152,7 @@ public class DeploymentInfoTest {
         assertEquals(42, deploymentInfo.getTimeout());
         assertEquals(true, deploymentInfo.isNoRoute());
         assertEquals("testdomain.local", deploymentInfo.getDomain());
-        assertEquals("target" + File.separator + "hello-java-" + PROJECT_VERSION + ".war", deploymentInfo.getAppPath());
+        assertEquals("hello-java-" + PROJECT_VERSION + ".war", deploymentInfo.getAppPath());
         assertEquals("https://github.com/heroku/heroku-buildpack-hello", deploymentInfo.getBuildpack());
         assertEquals("customstack", deploymentInfo.getStack());
         assertEquals("echo Hello", deploymentInfo.getCommand());
