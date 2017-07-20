@@ -284,7 +284,12 @@ public class CloudFoundryPushPublisher extends Recorder {
     private static List<ApplicationManifest> jenkinsConfig(AbstractBuild build, ManifestChoice manifestChoice) throws IOException, InterruptedException {
       ApplicationManifest.Builder manifestBuilder = ApplicationManifest.builder();
       manifestBuilder = !StringUtils.isBlank(manifestChoice.appName) ? manifestBuilder.name(manifestChoice.appName) : manifestBuilder;
-      manifestBuilder = !StringUtils.isBlank(manifestChoice.appPath) ? manifestBuilder.path(Paths.get(Paths.get(build.getWorkspace().toURI()).toString(), manifestChoice.appPath)) : manifestBuilder.path(Paths.get(build.getWorkspace().toURI()));
+      FilePath workspace = build.getWorkspace();
+      if (workspace != null) {
+        manifestBuilder = !StringUtils.isBlank(manifestChoice.appPath) ? manifestBuilder.path(Paths.get(Paths.get(workspace.toURI()).toString(), manifestChoice.appPath)) : manifestBuilder.path(Paths.get(workspace.toURI()));
+      } else {
+        throw new IllegalStateException("jenkins-configured push requires a non-null workspace");
+      }
       manifestBuilder = !StringUtils.isBlank(manifestChoice.buildpack) ? manifestBuilder.buildpack(manifestChoice.buildpack) : manifestBuilder;
       manifestBuilder = !StringUtils.isBlank(manifestChoice.command) ? manifestBuilder.command(manifestChoice.command) : manifestBuilder;
       manifestBuilder = !StringUtils.isBlank(manifestChoice.domain) ? manifestBuilder.domain(manifestChoice.domain) : manifestBuilder;
