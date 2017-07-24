@@ -82,7 +82,6 @@ public class CloudFoundryPushPublisherTest {
     private static final String TEST_NONMYSQL_SERVICE_TYPE = System.getProperty("nonmysqlServiceType", "filesystem");
     private static final String TEST_NONMYSQL_SERVICE_PLAN = System.getProperty("nonmysqlServicePlan", "free-local-disk");
     private static final String TEST_SERVICE_PLAN = System.getProperty("servicePlan", "free");
-    private static final String PROJECT_VERSION = System.getProperty("project.version");
 
     private static CloudFoundryClient client;
 
@@ -242,7 +241,7 @@ public class CloudFoundryPushPublisherTest {
         project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-java.zip")));
         ManifestChoice manifest =
                 new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 0, 0, false,
-                        "hello-java-" + PROJECT_VERSION + ".war", "", "", "", "",
+                        "hello-java-2.0.0.war", "", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
                 "testCredentialsId", true, false, 0, null, manifest);
@@ -273,7 +272,7 @@ public class CloudFoundryPushPublisherTest {
         project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-java.zip")));
         ManifestChoice manifest1 =
                 new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 0, 0, false,
-                        "hello-java-" + PROJECT_VERSION + ".war", "", "", "", "",
+                        "hello-java-2.0.0.war", "", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf1 = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
                 "testCredentialsId", true, true, 0, null, manifest1);
@@ -292,7 +291,7 @@ public class CloudFoundryPushPublisherTest {
 
         ManifestChoice manifest2 =
                 new ManifestChoice("jenkinsConfig", null, "hello-java", 256, "", 0, 0, false,
-                        "hello-java-" + PROJECT_VERSION + ".war", "", "", "", "",
+                        "hello-java-2.0.0.war", "", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf2 = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
                 "testCredentialsId", true, true, 0, null, manifest2);
@@ -313,7 +312,7 @@ public class CloudFoundryPushPublisherTest {
         project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-java.zip")));
         ManifestChoice manifest =
                 new ManifestChoice("jenkinsConfig", null, "hello-java", 160, "", 4, 0, false,
-                        "hello-java-" + PROJECT_VERSION + ".war", "", "", "", "",
+                        "hello-java-2.0.0.war", "", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
                 "testCredentialsId", true, false, 0, null, manifest);
@@ -444,7 +443,7 @@ public class CloudFoundryPushPublisherTest {
         project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-java.zip")));
         ManifestChoice manifest =
                 new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 0, 1, false,
-                        "hello-java-" + PROJECT_VERSION + ".war", "", "", "", "",
+                        "hello-java-2.0.0.war", "", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
                 "testCredentialsId", true, false, 0, null, manifest);
@@ -605,7 +604,7 @@ public class CloudFoundryPushPublisherTest {
         project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-java.zip")));
         ManifestChoice manifest =
                 new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 0, 0, true,
-                        "hello-java-" + PROJECT_VERSION + ".war", "", "", "", "",
+                        "hello-java-2.0.0.war", "", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
                 "testCredentialsId", true, false, 0, null, manifest);

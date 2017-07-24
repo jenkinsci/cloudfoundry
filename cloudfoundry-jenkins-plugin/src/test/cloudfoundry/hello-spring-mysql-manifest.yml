@@ -2,6 +2,6 @@
 applications:
 - name: hello-spring-mysql
   mem: 512M
-  path: hello-spring-mysql-${project.version}.war
+  path: hello-spring-mysql-2.0.0.war
   services:
   - mysql-spring

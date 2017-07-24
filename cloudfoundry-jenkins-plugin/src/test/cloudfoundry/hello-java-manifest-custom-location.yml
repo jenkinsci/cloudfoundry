@@ -2,4 +2,4 @@
 applications: 
 - name: hello-java
   memory: 512M
-  path: ../target/hello-java-${project.version}.war
+  path: ../target/hello-java-2.0.0.war

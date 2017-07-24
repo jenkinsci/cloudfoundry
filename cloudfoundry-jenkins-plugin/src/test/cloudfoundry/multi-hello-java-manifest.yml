@@ -2,7 +2,7 @@
 applications:
 - name: hello-java-1
   memory: 200M
-  path: hello-java-1/hello-java-${project.version}.war
+  path: hello-java-1/hello-java-2.0.0.war
 - name: hello-java-2
   memory: 300M
-  path: hello-java-2/hello-java-${project.version}.war
+  path: hello-java-2/hello-java-2.0.0.war

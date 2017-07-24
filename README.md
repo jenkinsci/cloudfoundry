@@ -47,18 +47,24 @@ export MAVEN_OPTS="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,address=8000,s
 
 Packaging:
 ----------
+
+Prior to running the tests, you will need to install the test apps into your local
+Maven repository. To do this, you simply run `mvn install` on each of the apps
+in the `test-apps` folder.
+
 If you already have a working Jenkins instance, use this command to create an .hpi file. You can then upload it to your
-Jenkins instance.
+Jenkins instance. From the `cloudfoundry-jenkins-plugin` folder:
 
 ```
 mvn clean install
 ```
 
-By default, the integration tests are skipped. If you have a working Cloud Foundry platform and want to run the tests
-before building, you will need to specify some arguments in your Maven command:
+By default, the integration tests expect a running Cloud Foundry platform available at `api.local.pcfdev.io`, with
+username `user` and password `pass`. If you have a different Cloud Foundry platform and want to run the tests
+against that platform instead, you will need to specify some arguments in your Maven command:
 
 ```
-mvn test -Dtarget=<target URL> -Dusername=<username> -Dpassword=<password> -Dorg=<org> -Dspace=<space>
+mvn test -Dcloudfoundry.target=<target fqdn> -Dcloudfoundry.username=<username> -Dcloudfoundry.password=<password> -Dcloudfoundry.org=<org> -Dcloudfoundry.space=<space>
 ```
 
 The tests will remove all existing applications and services in that space.

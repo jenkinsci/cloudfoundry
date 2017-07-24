@@ -9,7 +9,7 @@
   <dependencySets>
     <dependencySet>
       <includes>
-        <include>${project.groupId}:hello-spring-mysql:war:${project.version}</include>
+        <include>org.jenkins-ci.cloudfoundry-plugin.test:hello-spring-mysql:war:2.0.0</include>
       </includes>
       <scope>test</scope>
     </dependencySet>
