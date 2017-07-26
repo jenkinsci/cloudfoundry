@@ -34,6 +34,7 @@ import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.UnknownHostException;
+import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -210,7 +211,12 @@ public class CloudFoundryPushPublisher extends Recorder {
                 }
             }
 
-            List<ApplicationManifest> manifests = toManifests(build, manifestChoice);
+            FilePath masterPath = pathOnMaster(build.getWorkspace());
+            if (!masterPath.equals(build.getWorkspace())) {
+              masterPath = transferArtifactsToMaster(masterPath, build.getWorkspace(), manifestChoice, listener);
+            }
+
+            List<ApplicationManifest> manifests = toManifests(masterPath, manifestChoice);
             for(final ApplicationManifest manifest : manifests) {
               cloudFoundryOperations.applications().pushManifest(PushApplicationManifestRequest.builder().manifest(manifest).build())
                   .timeout(Duration.ofSeconds(pluginTimeout))
@@ -227,7 +233,9 @@ public class CloudFoundryPushPublisher extends Recorder {
               }
               printStagingLogs(cloudFoundryOperations, listener, manifest.getName());
             }
-
+            if (!masterPath.equals(build.getWorkspace())) {
+              masterPath.deleteRecursive();
+            }
             return true;
         } catch (MalformedURLException e) {
             listener.getLogger().println("ERROR: The target URL is not valid: " + e.getMessage());
@@ -244,21 +252,21 @@ public class CloudFoundryPushPublisher extends Recorder {
         }
     }
 
-    private static List<ApplicationManifest> toManifests(AbstractBuild build, ManifestChoice manifestChoice) throws IOException, InterruptedException {
+    private static List<ApplicationManifest> toManifests(FilePath filesPath, ManifestChoice manifestChoice) throws IOException, InterruptedException {
       switch(manifestChoice.value) {
         case "manifestFile":
-          return manifestFile(build, manifestChoice);
+          return manifestFile(filesPath, manifestChoice);
         case "jenkinsConfig":
-          return jenkinsConfig(build, manifestChoice);
+          return jenkinsConfig(filesPath, manifestChoice);
         default:
           throw new IllegalArgumentException("manifest choice must be either 'manifestFile' or 'jenkinsConfig', but was " + manifestChoice.value);
       }
     }
 
-    private static List<ApplicationManifest> manifestFile(AbstractBuild build, ManifestChoice manifestChoice) throws IOException, InterruptedException {
-      return ApplicationManifestUtils.read(Paths.get(new FilePath(build.getWorkspace(), manifestChoice.manifestFile).toURI()))
+    private static List<ApplicationManifest> manifestFile(FilePath filesPath, ManifestChoice manifestChoice) throws IOException, InterruptedException {
+      return ApplicationManifestUtils.read(Paths.get(new FilePath(filesPath, manifestChoice.manifestFile).toURI()))
           .stream()
-          .map(manifest -> fixManifest(build, manifest))
+          .map(manifest -> fixManifest(filesPath, manifest))
           .collect(Collectors.toList());
     }
 
@@ -268,11 +276,10 @@ public class CloudFoundryPushPublisher extends Recorder {
      * @param manifest the manifest
      * @return either the original manifest or a fixed-up version of the manifest
      */
-    private static ApplicationManifest fixManifest(final AbstractBuild build, final ApplicationManifest manifest) {
-      FilePath workspace = build.getWorkspace();
-      if (workspace != null && manifest.getPath()==null && StringUtils.isEmpty(manifest.getDockerImage())) {
+    private static ApplicationManifest fixManifest(final FilePath filesPath, final ApplicationManifest manifest) {
+      if (manifest.getPath()==null && StringUtils.isEmpty(manifest.getDockerImage())) {
         try {
-          return ApplicationManifest.builder().from(manifest).path(Paths.get(workspace.toURI())).build();
+          return ApplicationManifest.builder().from(manifest).path(Paths.get(filesPath.toURI())).build();
         } catch(IOException | InterruptedException e) {
           throw new RuntimeException(e);
         }
@@ -281,15 +288,54 @@ public class CloudFoundryPushPublisher extends Recorder {
       }
     }
 
-    private static List<ApplicationManifest> jenkinsConfig(AbstractBuild build, ManifestChoice manifestChoice) throws IOException, InterruptedException {
+    private static FilePath pathOnMaster(final FilePath path) throws IOException, InterruptedException {
+      if (path.getChannel() != FilePath.localChannel) {
+        // The build is distributed
+        // We need to make a copy of the target file/directory on the master
+        File tempFile = Files.createTempDirectory("appDir").toFile();
+        tempFile.deleteOnExit();
+        return new FilePath(tempFile);
+      }else {
+        return path;
+      }
+    }
+
+    private FilePath transferArtifactsToMaster(FilePath masterPath, FilePath workspacePath, ManifestChoice manifestChoice, BuildListener listener) throws IOException, InterruptedException {
+      FilePath results = masterPath;
+      if (masterPath != workspacePath) {
+        listener.getLogger().println("INFO: Looks like we are on a distributed system... Transferring build artifacts from the slave to the master.");
+        // only transfer artifacts if we aren't on the master
+        FilePath appPath = new FilePath(workspacePath, manifestChoice.appPath == null ? "" : manifestChoice.appPath);
+        // The build is distributed, and a directory
+        // We need to make a copy of the target directory on the master
+        FilePath zipFilePath = new FilePath(masterPath, "appFile");
+        try(OutputStream outputStream = new FileOutputStream(Paths.get(zipFilePath.toURI()).toFile())) {
+          listener.getLogger().println(String.format("INFO: Transferring from %s to %s", appPath.getRemote(), masterPath.getRemote()));
+          appPath.zip(outputStream);
+        }
+        zipFilePath.unzip(masterPath);
+        try {
+          zipFilePath.delete();
+        } catch(IOException ex) {
+          listener.getLogger().println("WARNING: temporary files were not deleted successfully.");
+        }
+
+        // appPath.zip() creates a top level directory that we want to remove
+        File[] listFiles = new File(masterPath.toURI()).listFiles();
+        if (listFiles != null && listFiles.length == 1) {
+            results = new FilePath(listFiles[0]);
+        } else {
+            // This should never happen because appPath.zip() always makes a directory
+            throw new IllegalStateException("Unzipped output directory was empty.");
+        }
+      }
+      return results;
+    }
+
+    private static List<ApplicationManifest> jenkinsConfig(FilePath filesPath, ManifestChoice manifestChoice) throws IOException, InterruptedException {
       ApplicationManifest.Builder manifestBuilder = ApplicationManifest.builder();
       manifestBuilder = !StringUtils.isBlank(manifestChoice.appName) ? manifestBuilder.name(manifestChoice.appName) : manifestBuilder;
-      FilePath workspace = build.getWorkspace();
-      if (workspace != null) {
-        manifestBuilder = !StringUtils.isBlank(manifestChoice.appPath) ? manifestBuilder.path(Paths.get(Paths.get(workspace.toURI()).toString(), manifestChoice.appPath)) : manifestBuilder.path(Paths.get(workspace.toURI()));
-      } else {
-        throw new IllegalStateException("jenkins-configured push requires a non-null workspace");
-      }
+      manifestBuilder = !StringUtils.isBlank(manifestChoice.appPath) ? manifestBuilder.path(Paths.get(Paths.get(filesPath.toURI()).toString(), manifestChoice.appPath)) : manifestBuilder.path(Paths.get(filesPath.toURI()));
       manifestBuilder = !StringUtils.isBlank(manifestChoice.buildpack) ? manifestBuilder.buildpack(manifestChoice.buildpack) : manifestBuilder;
       manifestBuilder = !StringUtils.isBlank(manifestChoice.command) ? manifestBuilder.command(manifestChoice.command) : manifestBuilder;
       manifestBuilder = !StringUtils.isBlank(manifestChoice.domain) ? manifestBuilder.domain(manifestChoice.domain) : manifestBuilder;
