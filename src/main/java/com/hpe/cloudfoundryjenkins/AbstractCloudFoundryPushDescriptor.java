@@ -3,15 +3,14 @@
   */
 package com.hpe.cloudfoundryjenkins;
 
-import com.cloudbees.plugins.credentials.CredentialsMatchers;
-import com.cloudbees.plugins.credentials.CredentialsProvider;
 import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
-import com.cloudbees.plugins.credentials.common.StandardUsernameCredentials;
 import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials;
 import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
 import hudson.model.AbstractProject;
 import hudson.model.Describable;
 import hudson.model.ItemGroup;
+import hudson.model.Queue;
+import hudson.model.queue.Tasks;
 import hudson.security.ACL;
 import hudson.tasks.BuildStep;
 import hudson.tasks.BuildStepDescriptor;
@@ -85,8 +84,8 @@ public abstract class AbstractCloudFoundryPushDescriptor<T extends BuildStep & D
     @SuppressWarnings(value = "unused")
     public ListBoxModel doFillCredentialsIdItems(@AncestorInPath ItemGroup context, @QueryParameter(value = "target") final String target) {
         StandardListBoxModel result = new StandardListBoxModel();
-        result.withEmptySelection();
-        result.withMatching(CredentialsMatchers.instanceOf(StandardUsernamePasswordCredentials.class), CredentialsProvider.lookupCredentials(StandardUsernameCredentials.class, context, ACL.SYSTEM, URIRequirementBuilder.fromUri(target).build()));
+        result.includeEmptyValue();
+        result.includeMatchingAs(context instanceof Queue.Task ? Tasks.getAuthenticationOf((Queue.Task)context) : ACL.SYSTEM, context, StandardUsernamePasswordCredentials.class, URIRequirementBuilder.fromUri(target).build(), null);
         return result;
     }
 
