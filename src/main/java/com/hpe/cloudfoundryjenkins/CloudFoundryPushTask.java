@@ -159,11 +159,13 @@ public class CloudFoundryPushTask {
             }
 
             FilePath masterPath = pathOnMaster(workspace);
+            boolean isOnSlave = false;
             if (masterPath == null || !masterPath.equals(workspace)) {
               masterPath = transferArtifactsToMaster(masterPath, workspace, manifestChoice, listener);
+              isOnSlave = true;
             }
 
-            List<ApplicationManifest> manifests = toManifests(masterPath, manifestChoice);
+            List<ApplicationManifest> manifests = toManifests(masterPath, manifestChoice, isOnSlave);
             for(final ApplicationManifest manifest : manifests) {
               cloudFoundryOperations.applications().pushManifest(PushApplicationManifestRequest.builder().manifest(manifest).build())
                   .timeout(Duration.ofSeconds(pluginTimeout))
@@ -190,12 +192,13 @@ public class CloudFoundryPushTask {
         }
   }
 
-  private List<ApplicationManifest> toManifests(FilePath filesPath, CloudFoundryPushPublisher.ManifestChoice manifestChoice) throws IOException, InterruptedException {
+  private List<ApplicationManifest> toManifests(FilePath filesPath, CloudFoundryPushPublisher.ManifestChoice
+          manifestChoice, boolean isOnSlave) throws IOException, InterruptedException {
       switch(manifestChoice.value) {
         case "manifestFile":
           return manifestFile(filesPath, manifestChoice);
         case "jenkinsConfig":
-          return jenkinsConfig(filesPath, manifestChoice);
+          return jenkinsConfig(filesPath, manifestChoice, isOnSlave);
         default:
           throw new IllegalArgumentException("manifest choice must be either 'manifestFile' or 'jenkinsConfig', but was " + manifestChoice.value);
       }
@@ -273,7 +276,12 @@ public class CloudFoundryPushTask {
     private static List<ApplicationManifest> jenkinsConfig(FilePath filesPath, CloudFoundryPushPublisher.ManifestChoice manifestChoice) throws IOException, InterruptedException {
       ApplicationManifest.Builder manifestBuilder = ApplicationManifest.builder();
       manifestBuilder = !StringUtils.isBlank(manifestChoice.appName) ? manifestBuilder.name(manifestChoice.appName) : manifestBuilder;
-      manifestBuilder = !StringUtils.isBlank(manifestChoice.appPath) ? manifestBuilder.path(Paths.get(Paths.get(filesPath.toURI()).toString(), manifestChoice.appPath)) : manifestBuilder.path(Paths.get(filesPath.toURI()));
+      if(isOnSlave)
+       manifestBuilder = !StringUtils.isBlank(manifestChoice.appPath) ? manifestBuilder.path(Paths.get(Paths.get
+               (filesPath.toURI()).toString())) : manifestBuilder.path(Paths.get(filesPath.toURI()));
+      else
+       manifestBuilder = !StringUtils.isBlank(manifestChoice.appPath) ? manifestBuilder.path(Paths.get(Paths.get
+               (filesPath.toURI()).toString(), manifestChoice.appPath)) : manifestBuilder.path(Paths.get(filesPath.toURI()));
       manifestBuilder = !StringUtils.isBlank(manifestChoice.buildpack) ? manifestBuilder.buildpack(manifestChoice.buildpack) : manifestBuilder;
       manifestBuilder = !StringUtils.isBlank(manifestChoice.command) ? manifestBuilder.command(manifestChoice.command) : manifestBuilder;
       manifestBuilder = !StringUtils.isBlank(manifestChoice.domain) ? manifestBuilder.domain(manifestChoice.domain) : manifestBuilder;
