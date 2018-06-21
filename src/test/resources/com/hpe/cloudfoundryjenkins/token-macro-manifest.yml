@@ -1,3 +1,3 @@
 ---
 applications:
-- name: ${BUILD_DISPLAY_NAME}
+- name: ${JOB_NAME}

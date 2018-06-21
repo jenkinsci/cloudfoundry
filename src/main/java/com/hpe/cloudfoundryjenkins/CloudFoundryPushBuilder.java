@@ -163,13 +163,13 @@ public class CloudFoundryPushBuilder extends Builder implements SimpleBuildStep 
     @Override
     public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener) throws InterruptedException, IOException {
         CloudFoundryPushTask task = new CloudFoundryPushTask(target, organization, cloudSpace, credentialsId, selfSigned, pluginTimeout, servicesToCreate, manifestChoice);
-        return task.perform(build.getWorkspace(), build.getProject(), launcher, listener);
+        return task.perform(build.getWorkspace(), build, launcher, listener);
     }
 
     @Override
     public void perform(Run<?, ?> run, FilePath workspace, Launcher launcher, TaskListener listener) throws InterruptedException, IOException {
       CloudFoundryPushTask task = new CloudFoundryPushTask(target, organization, cloudSpace, credentialsId, selfSigned, pluginTimeout, servicesToCreate, manifestChoice);
-      if (!task.perform(workspace, run.getParent(), launcher, listener)) {
+      if (!task.perform(workspace, run, launcher, listener)) {
         throw new AbortException("CloudFoundry Push failed.");
       }
     }
