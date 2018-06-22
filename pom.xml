@@ -210,6 +210,7 @@
             <servicePlan>${cloudfoundry.servicePlan}</servicePlan>
             <jenkins.test.timeout>${jenkins.test.timeout}</jenkins.test.timeout>
           </systemPropertyVariables>
+          <argLine>-Xmx1g</argLine>
         </configuration>
       </plugin>
 
