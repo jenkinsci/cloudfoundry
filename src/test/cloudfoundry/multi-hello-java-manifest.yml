@@ -1,8 +1,10 @@
 ---
 applications:
 - name: hello-java-1
-  memory: 200M
+  memory: 1G
   path: hello-java-1/hello-java-2.0.0.war
+  timeout: 180
 - name: hello-java-2
-  memory: 300M
+  memory: 1G
   path: hello-java-2/hello-java-2.0.0.war
+  timeout: 180

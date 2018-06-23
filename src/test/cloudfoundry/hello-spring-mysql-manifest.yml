@@ -1,7 +1,8 @@
 ---
 applications:
 - name: hello-spring-mysql
-  mem: 512M
+  memory: 1G
   path: hello-spring-mysql-2.0.0.war
+  timeout: 180
   services:
   - mysql-spring

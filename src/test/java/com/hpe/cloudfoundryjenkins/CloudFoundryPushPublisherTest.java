@@ -254,7 +254,7 @@ public class CloudFoundryPushPublisherTest {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-java.zip")));
         ManifestChoice manifest =
-                new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 0, 0, false,
+                new ManifestChoice("jenkinsConfig", null, "hello-java", "1g", "", null, null, null,
                         "hello-java-2.0.0.war", "", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
@@ -285,7 +285,7 @@ public class CloudFoundryPushPublisherTest {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-java.zip")));
         ManifestChoice manifest1 =
-                new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 0, 0, false,
+                new ManifestChoice("jenkinsConfig", null, "hello-java", "1g", "", null, null, null,
                         "hello-java-2.0.0.war", "", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf1 = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
@@ -299,12 +299,12 @@ public class CloudFoundryPushPublisherTest {
 
         assertTrue("Build 1 did not succeed", build.getResult().isBetterOrEqualTo(Result.SUCCESS));
         assertTrue("Build 1 did not display staging logs", log.contains("Downloaded app package"));
-        assertEquals((long) 512, (long) cloudFoundryOperations.applications().get(GetApplicationRequest.builder().name("hello-java").build()).block().getMemoryLimit());
+        assertEquals((long) 1024, (long) cloudFoundryOperations.applications().get(GetApplicationRequest.builder().name("hello-java").build()).block().getMemoryLimit());
 
         project.getPublishersList().remove(cf1);
 
         ManifestChoice manifest2 =
-                new ManifestChoice("jenkinsConfig", null, "hello-java", 256, "", 0, 0, false,
+                new ManifestChoice("jenkinsConfig", null, "hello-java", "1g", "", null, null, null,
                         "hello-java-2.0.0.war", "", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf2 = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
@@ -317,7 +317,7 @@ public class CloudFoundryPushPublisherTest {
 
         assertTrue("Build 2 did not succeed", build.getResult().isBetterOrEqualTo(Result.SUCCESS));
         assertTrue("Build 2 did not display staging logs", log.contains("Downloaded app package"));
-        assertEquals((long) 256, (long) cloudFoundryOperations.applications().get(GetApplicationRequest.builder().name("hello-java").build()).block().getMemoryLimit());
+        assertEquals((long) 1024, (long) cloudFoundryOperations.applications().get(GetApplicationRequest.builder().name("hello-java").build()).block().getMemoryLimit());
     }
 
     @Test
@@ -325,7 +325,7 @@ public class CloudFoundryPushPublisherTest {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-java.zip")));
         ManifestChoice manifest =
-                new ManifestChoice("jenkinsConfig", null, "hello-java", 160, "", 4, 0, false,
+                new ManifestChoice("jenkinsConfig", null, "hello-java", "1g", "", "4", null, null,
                         "hello-java-2.0.0.war", "", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
@@ -356,7 +356,7 @@ public class CloudFoundryPushPublisherTest {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("heroku-node-js-sample.zip")));
         ManifestChoice manifest =
-                new ManifestChoice("jenkinsConfig", null, "heroku-node-js-sample", 512, "", 1, 60, false, "",
+                new ManifestChoice("jenkinsConfig", null, "heroku-node-js-sample", "512", "", "1", "60", null, "",
                         "https://github.com/heroku/heroku-buildpack-nodejs", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
@@ -407,7 +407,7 @@ public class CloudFoundryPushPublisherTest {
         String content1 = EntityUtils.toString(response1.getEntity());
         System.out.println(content1);
         assertTrue("hello-java-1 did not send back correct text", content1.contains("Hello from"));
-        assertEquals((long) 200, (long) cloudFoundryOperations.applications().get(GetApplicationRequest.builder().name("hello-java-1").build()).block().getMemoryLimit());
+        assertEquals((long) 1024, (long) cloudFoundryOperations.applications().get(GetApplicationRequest.builder().name("hello-java-1").build()).block().getMemoryLimit());
         String uri2 = appUris.get(1);
         HttpResponse response2 = httpClient.execute(new HttpGet(uri2));
         int statusCode2 = response2.getStatusLine().getStatusCode();
@@ -415,7 +415,7 @@ public class CloudFoundryPushPublisherTest {
         String content2 = EntityUtils.toString(response2.getEntity());
         System.out.println(content2);
         assertTrue("hello-java-2 did not send back correct text", content2.contains("Hello from"));
-        assertEquals((long) 300, (long) cloudFoundryOperations.applications().get(GetApplicationRequest.builder().name("hello-java-2").build()).block().getMemoryLimit());
+        assertEquals((long) 1024, (long) cloudFoundryOperations.applications().get(GetApplicationRequest.builder().name("hello-java-2").build()).block().getMemoryLimit());
     }
 
     @Test
@@ -424,7 +424,7 @@ public class CloudFoundryPushPublisherTest {
         project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-java-custom-manifest-location.zip")));
 
         ManifestChoice manifestChoice = new ManifestChoice("manifestFile", "manifest/manifest.yml",
-                null, 0, null, 0, 0, false, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null, null, null, null);
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
                 "testCredentialsId", true, false, 0, null, manifestChoice);
         project.getPublishersList().add(cf);
@@ -456,7 +456,7 @@ public class CloudFoundryPushPublisherTest {
 
         project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-java.zip")));
         ManifestChoice manifest =
-                new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 0, 1, false,
+                new ManifestChoice("jenkinsConfig", null, "hello-java", "1g", "", null, "1", null,
                         "hello-java-2.0.0.war", "", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,
@@ -617,7 +617,7 @@ public class CloudFoundryPushPublisherTest {
         FreeStyleProject project = j.createFreeStyleProject();
         project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-java.zip")));
         ManifestChoice manifest =
-                new ManifestChoice("jenkinsConfig", null, "hello-java", 512, "", 0, 0, true,
+                new ManifestChoice("jenkinsConfig", null, "hello-java", "1g", "", null, null, "true",
                         "hello-java-2.0.0.war", "", "", "", "",
                         new ArrayList<EnvironmentVariable>(), new ArrayList<ServiceName>());
         CloudFoundryPushPublisher cf = new CloudFoundryPushPublisher(TEST_TARGET, TEST_ORG, TEST_SPACE,

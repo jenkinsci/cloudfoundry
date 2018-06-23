@@ -88,7 +88,7 @@
     <cloudfoundry.space>cfdev-space</cloudfoundry.space>
     <cloudfoundry.mysqlServiceType>p-mysql</cloudfoundry.mysqlServiceType>
     <cloudfoundry.nonmysqlServiceType>local-volume</cloudfoundry.nonmysqlServiceType>
-    <cloudfoundry.servicePlan>512mb</cloudfoundry.servicePlan>
+    <cloudfoundry.servicePlan>20mb</cloudfoundry.servicePlan>
     <jenkins.test.timeout>300</jenkins.test.timeout>
   </properties>
 
@@ -152,6 +152,13 @@
     </dependency>
 
     <dependency>
+      <groupId>org.jenkins-ci.plugins</groupId>
+      <artifactId>envinject</artifactId>
+      <version>2.1.5</version>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>fluent-hc</artifactId>
       <version>4.5.3</version>
@@ -210,7 +217,6 @@
             <servicePlan>${cloudfoundry.servicePlan}</servicePlan>
             <jenkins.test.timeout>${jenkins.test.timeout}</jenkins.test.timeout>
           </systemPropertyVariables>
-          <argLine>-Xmx1g</argLine>
         </configuration>
       </plugin>
 
