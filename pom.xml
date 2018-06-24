@@ -81,14 +81,14 @@
       They can be overridden via system properties in MAVEN_OPTS,
       e.g. MAVEN_OPTS="-Dcloudfoundry.target=..."
     -->
-    <cloudfoundry.target>api.v3.pcfdev.io</cloudfoundry.target>
+    <cloudfoundry.target>api.local.pcfdev.io</cloudfoundry.target>
     <cloudfoundry.username>user</cloudfoundry.username>
     <cloudfoundry.password>pass</cloudfoundry.password>
-    <cloudfoundry.org>cfdev-org</cloudfoundry.org>
-    <cloudfoundry.space>cfdev-space</cloudfoundry.space>
+    <cloudfoundry.org>pcfdev-org</cloudfoundry.org>
+    <cloudfoundry.space>pcfdev-space</cloudfoundry.space>
     <cloudfoundry.mysqlServiceType>p-mysql</cloudfoundry.mysqlServiceType>
     <cloudfoundry.nonmysqlServiceType>local-volume</cloudfoundry.nonmysqlServiceType>
-    <cloudfoundry.servicePlan>20mb</cloudfoundry.servicePlan>
+    <cloudfoundry.servicePlan>512mb</cloudfoundry.servicePlan>
     <jenkins.test.timeout>300</jenkins.test.timeout>
   </properties>
 
