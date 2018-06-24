@@ -467,7 +467,7 @@ public class CloudFoundryPushBuilderTest {
 
     project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-java.zip")));
     ManifestChoice manifest
-            = new ManifestChoice("jenkinsConfig", null, "hello-java", "1g", "", "0", "1", "false",
+            = new ManifestChoice("jenkinsConfig", null, "hello-java", "1g", "", "1", "1", "false",
                     "hello-java-2.0.0.war", "", "", "", "",
                     new ArrayList<>(), new ArrayList<>());
     CloudFoundryPushBuilder cf = new CloudFoundryPushBuilder(TEST_TARGET, TEST_ORG, TEST_SPACE,
