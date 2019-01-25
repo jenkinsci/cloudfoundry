@@ -9,6 +9,7 @@ import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredenti
 import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
 import hudson.model.AbstractProject;
 import hudson.model.Describable;
+import hudson.model.Item;
 import hudson.model.ItemGroup;
 import hudson.model.Queue;
 import hudson.model.queue.Tasks;
@@ -19,6 +20,8 @@ import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
 import java.net.MalformedURLException;
 import java.net.URL;
+
+import jenkins.model.Jenkins;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.QueryParameter;
 
@@ -101,7 +104,19 @@ public abstract class AbstractCloudFoundryPushDescriptor<T extends BuildStep & D
      * @return the validation result
      */
     @SuppressWarnings(value = "unused")
-    public FormValidation doTestConnection(@AncestorInPath ItemGroup context, @QueryParameter(value = "target") final String target, @QueryParameter(value = "credentialsId") final String credentialsId, @QueryParameter(value = "organization") final String organization, @QueryParameter(value = "cloudSpace") final String cloudSpace, @QueryParameter(value = "selfSigned") final String selfSigned) {
+    public FormValidation doTestConnection(@AncestorInPath ItemGroup context,
+                                           @AncestorInPath Item item,
+                                           @QueryParameter(value = "target") final String target,
+                                           @QueryParameter(value = "credentialsId") final String credentialsId,
+                                           @QueryParameter(value = "organization") final String organization,
+                                           @QueryParameter(value = "cloudSpace") final String cloudSpace,
+                                           @QueryParameter(value = "selfSigned") final String selfSigned) {
+
+        if (item == null) {
+            Jenkins.getInstance().checkPermission( Jenkins.ADMINISTER);
+        } else {
+            item.checkPermission(Item.CONFIGURE);
+        }
         return CloudFoundryUtils.doTestConnection(context, target, credentialsId, organization, cloudSpace, selfSigned);
     }
 

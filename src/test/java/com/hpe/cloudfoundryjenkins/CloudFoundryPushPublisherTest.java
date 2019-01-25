@@ -5,47 +5,30 @@
 
 package com.hpe.cloudfoundryjenkins;
 
-import com.hpe.cloudfoundryjenkins.CloudFoundryPushPublisher.EnvironmentVariable;
-import com.hpe.cloudfoundryjenkins.CloudFoundryPushPublisher.ManifestChoice;
-import com.hpe.cloudfoundryjenkins.CloudFoundryPushPublisher.ServiceName;
-import com.hpe.cloudfoundryjenkins.CloudFoundryPushPublisher.Service;
 import com.cloudbees.plugins.credentials.CredentialsProvider;
 import com.cloudbees.plugins.credentials.CredentialsScope;
 import com.cloudbees.plugins.credentials.CredentialsStore;
 import com.cloudbees.plugins.credentials.domains.Domain;
 import com.cloudbees.plugins.credentials.impl.UsernamePasswordCredentialsImpl;
+import com.hpe.cloudfoundryjenkins.CloudFoundryPushPublisher.EnvironmentVariable;
+import com.hpe.cloudfoundryjenkins.CloudFoundryPushPublisher.ManifestChoice;
+import com.hpe.cloudfoundryjenkins.CloudFoundryPushPublisher.Service;
+import com.hpe.cloudfoundryjenkins.CloudFoundryPushPublisher.ServiceName;
 import hudson.ProxyConfiguration;
 import hudson.model.FreeStyleBuild;
 import hudson.model.FreeStyleProject;
 import hudson.model.Result;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.http.HttpResponse;
-import org.apache.http.util.EntityUtils;
-import org.cloudfoundry.client.CloudFoundryClient;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.jvnet.hudson.test.ExtractResourceSCM;
-import org.jvnet.hudson.test.JenkinsRule;
-import org.jvnet.hudson.test.recipes.WithTimeout;
-
-import java.io.IOException;
-import java.net.URL;
-import java.security.KeyManagementException;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.conn.ssl.TrustSelfSignedStrategy;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.ssl.SSLContextBuilder;
+import org.apache.http.util.EntityUtils;
+import org.cloudfoundry.client.CloudFoundryClient;
 import org.cloudfoundry.client.v2.applications.DeleteApplicationRequest;
 import org.cloudfoundry.client.v2.routes.DeleteRouteRequest;
 import org.cloudfoundry.client.v2.servicebindings.DeleteServiceBindingRequest;
@@ -67,12 +50,27 @@ import org.cloudfoundry.reactor.tokenprovider.PasswordGrantTokenProvider;
 import org.cloudfoundry.reactor.uaa.ReactorUaaClient;
 import org.cloudfoundry.uaa.UaaClient;
 import org.junit.AfterClass;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.ClassRule;
+import org.junit.Test;
+import org.jvnet.hudson.test.ExtractResourceSCM;
+import org.jvnet.hudson.test.JenkinsRule;
+import org.jvnet.hudson.test.recipes.WithTimeout;
+import reactor.core.publisher.Flux;
+
+import java.io.IOException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assume.assumeNotNull;
-import org.junit.ClassRule;
-import reactor.core.publisher.Flux;
+import static org.junit.Assume.assumeTrue;
 
 public class CloudFoundryPushPublisherTest {
 
@@ -114,9 +112,13 @@ public class CloudFoundryPushPublisherTest {
             .build());
     }
 
+    private static void assumeNotNull(String value){
+        assumeTrue( StringUtils.isNotEmpty( value ));
+    }
+
 
     @BeforeClass
-    public static void initialiseClient() throws IOException {
+    public static void initialiseClient() throws Exception {
         // Skip all tests of this class if no test CF platform is specified
         assumeNotNull(TEST_TARGET);
 
@@ -163,10 +165,7 @@ public class CloudFoundryPushPublisherTest {
             .organization(TEST_ORG)
             .space(TEST_SPACE)
             .build();
-    }
 
-    @BeforeClass
-    public static void setupHttpClient() throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
       SSLContextBuilder builder = new SSLContextBuilder();
       builder.loadTrustMaterial(null, new TrustSelfSignedStrategy());
       SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(
@@ -177,6 +176,9 @@ public class CloudFoundryPushPublisherTest {
 
     @AfterClass
     public static void cleanCloudSpace() throws IOException {
+        if(StringUtils.isEmpty( TEST_TARGET )){
+            return;
+        }
         cloudFoundryOperations.routes()
             .list(ListRoutesRequest.builder().level(Level.SPACE).build())
             .map(route -> DeleteRouteRequest.builder().routeId(route.getId()).build())
@@ -215,8 +217,10 @@ public class CloudFoundryPushPublisherTest {
 
     @Before
     public void setupCredentialsAndCleanCloudSpace() throws IOException {
-      cleanCloudSpace();
-      CredentialsStore store = CredentialsProvider.lookupStores(j.getInstance()).iterator().next();
+        // Skip all tests of this class if no test CF platform is specified
+        assumeNotNull(TEST_TARGET);
+        cleanCloudSpace();
+        CredentialsStore store = CredentialsProvider.lookupStores(j.getInstance()).iterator().next();
         store.addCredentials(Domain.global(),
                 new UsernamePasswordCredentialsImpl(CredentialsScope.GLOBAL, "testCredentialsId", "",
                         TEST_USERNAME, TEST_PASSWORD));

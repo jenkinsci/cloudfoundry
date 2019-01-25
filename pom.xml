@@ -80,8 +80,9 @@
 
       They can be overridden via system properties in MAVEN_OPTS,
       e.g. MAVEN_OPTS="-Dcloudfoundry.target=..."
+      api.local.pcfdev.io
     -->
-    <cloudfoundry.target>api.local.pcfdev.io</cloudfoundry.target>
+    <cloudfoundry.target></cloudfoundry.target>
     <cloudfoundry.username>user</cloudfoundry.username>
     <cloudfoundry.password>pass</cloudfoundry.password>
     <cloudfoundry.org>pcfdev-org</cloudfoundry.org>

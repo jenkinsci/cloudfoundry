@@ -3,47 +3,30 @@
  */
 package com.hpe.cloudfoundryjenkins;
 
-import com.hpe.cloudfoundryjenkins.CloudFoundryPushPublisher.EnvironmentVariable;
-import com.hpe.cloudfoundryjenkins.CloudFoundryPushPublisher.ManifestChoice;
-import com.hpe.cloudfoundryjenkins.CloudFoundryPushPublisher.ServiceName;
-import com.hpe.cloudfoundryjenkins.CloudFoundryPushPublisher.Service;
 import com.cloudbees.plugins.credentials.CredentialsProvider;
 import com.cloudbees.plugins.credentials.CredentialsScope;
 import com.cloudbees.plugins.credentials.CredentialsStore;
 import com.cloudbees.plugins.credentials.domains.Domain;
 import com.cloudbees.plugins.credentials.impl.UsernamePasswordCredentialsImpl;
+import com.hpe.cloudfoundryjenkins.CloudFoundryPushPublisher.EnvironmentVariable;
+import com.hpe.cloudfoundryjenkins.CloudFoundryPushPublisher.ManifestChoice;
+import com.hpe.cloudfoundryjenkins.CloudFoundryPushPublisher.Service;
+import com.hpe.cloudfoundryjenkins.CloudFoundryPushPublisher.ServiceName;
 import hudson.ProxyConfiguration;
 import hudson.model.FreeStyleBuild;
 import hudson.model.FreeStyleProject;
 import hudson.model.Result;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.http.HttpResponse;
-import org.apache.http.util.EntityUtils;
-import org.cloudfoundry.client.CloudFoundryClient;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.jvnet.hudson.test.ExtractResourceSCM;
-import org.jvnet.hudson.test.JenkinsRule;
-import org.jvnet.hudson.test.recipes.WithTimeout;
-
-import java.io.IOException;
-import java.net.URL;
-import java.security.KeyManagementException;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.conn.ssl.TrustSelfSignedStrategy;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.ssl.SSLContextBuilder;
+import org.apache.http.util.EntityUtils;
+import org.cloudfoundry.client.CloudFoundryClient;
 import org.cloudfoundry.client.v2.applications.DeleteApplicationRequest;
 import org.cloudfoundry.client.v2.routes.DeleteRouteRequest;
 import org.cloudfoundry.client.v2.servicebindings.DeleteServiceBindingRequest;
@@ -65,13 +48,28 @@ import org.cloudfoundry.reactor.tokenprovider.PasswordGrantTokenProvider;
 import org.cloudfoundry.reactor.uaa.ReactorUaaClient;
 import org.cloudfoundry.uaa.UaaClient;
 import org.junit.AfterClass;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.ClassRule;
+import org.junit.Test;
+import org.jvnet.hudson.test.ExtractResourceSCM;
+import org.jvnet.hudson.test.Issue;
+import org.jvnet.hudson.test.JenkinsRule;
+import org.jvnet.hudson.test.recipes.WithTimeout;
+import reactor.core.publisher.Flux;
+
+import java.io.IOException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assume.assumeNotNull;
-import org.junit.ClassRule;
-import org.jvnet.hudson.test.Issue;
-import reactor.core.publisher.Flux;
+import static org.junit.Assume.assumeTrue;
 
 public class CloudFoundryPushBuilderTest {
 
@@ -114,7 +112,7 @@ public class CloudFoundryPushBuilderTest {
   }
 
   @BeforeClass
-  public static void initialiseClient() throws IOException {
+  public static void initialiseClient() throws Exception {
     // Skip all tests of this class if no test CF platform is specified
     assumeNotNull(TEST_TARGET);
 
@@ -161,10 +159,7 @@ public class CloudFoundryPushBuilderTest {
             .organization(TEST_ORG)
             .space(TEST_SPACE)
             .build();
-  }
 
-  @BeforeClass
-  public static void setupHttpClient() throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
     SSLContextBuilder builder = new SSLContextBuilder();
     builder.loadTrustMaterial(null, new TrustSelfSignedStrategy());
     SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(
@@ -175,6 +170,9 @@ public class CloudFoundryPushBuilderTest {
 
   @AfterClass
   public static void cleanCloudSpace() throws IOException {
+    if(StringUtils.isEmpty( TEST_TARGET )){
+      return;
+    }
     cloudFoundryOperations.routes()
             .list(ListRoutesRequest.builder().level(Level.SPACE).build())
             .map(route -> DeleteRouteRequest.builder().routeId(route.getId()).build())
@@ -213,6 +211,8 @@ public class CloudFoundryPushBuilderTest {
 
   @Before
   public void setupCredentialsAndCleanCloudSpace() throws IOException {
+    // Skip all tests of this class if no test CF platform is specified
+    assumeNotNull(TEST_TARGET);
     cleanCloudSpace();
     CredentialsStore store = CredentialsProvider.lookupStores(j.getInstance()).iterator().next();
     store.addCredentials(Domain.global(),
@@ -220,8 +220,14 @@ public class CloudFoundryPushBuilderTest {
                     TEST_USERNAME, TEST_PASSWORD));
   }
 
+  private static void assumeNotNull(String value){
+    assumeTrue(StringUtils.isNotEmpty( value ));
+  }
+
   @Test
   public void testPerformSimplePushManifestFile() throws Exception {
+    // Skip all tests of this class if no test CF platform is specified
+    assumeNotNull(TEST_TARGET);
     FreeStyleProject project = j.createFreeStyleProject();
     project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-java.zip")));
 
@@ -250,6 +256,8 @@ public class CloudFoundryPushBuilderTest {
 
   @Test
   public void testPerformSimplePushJenkinsConfig() throws Exception {
+    // Skip all tests of this class if no test CF platform is specified
+    assumeNotNull(TEST_TARGET);
     FreeStyleProject project = j.createFreeStyleProject();
     project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-java.zip")));
     ManifestChoice manifest
@@ -283,6 +291,8 @@ public class CloudFoundryPushBuilderTest {
   @Test
   @WithTimeout(600)
   public void testPerformResetIfExists() throws Exception {
+    // Skip all tests of this class if no test CF platform is specified
+    assumeNotNull(TEST_TARGET);
     FreeStyleProject project = j.createFreeStyleProject();
     project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-java.zip")));
     ManifestChoice manifest1
@@ -327,6 +337,8 @@ public class CloudFoundryPushBuilderTest {
 
   @Test
   public void testPerformMultipleInstances() throws Exception {
+    // Skip all tests of this class if no test CF platform is specified
+    assumeNotNull(TEST_TARGET);
     FreeStyleProject project = j.createFreeStyleProject();
     project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-java.zip")));
     ManifestChoice manifest
@@ -360,6 +372,8 @@ public class CloudFoundryPushBuilderTest {
 
   @Test
   public void testPerformCustomBuildpack() throws Exception {
+    // Skip all tests of this class if no test CF platform is specified
+    assumeNotNull(TEST_TARGET);
     FreeStyleProject project = j.createFreeStyleProject();
     project.setScm(new ExtractResourceSCM(getClass().getResource("heroku-node-js-sample.zip")));
     ManifestChoice manifest
@@ -392,6 +406,8 @@ public class CloudFoundryPushBuilderTest {
 
   @Test
   public void testPerformMultiAppManifest() throws Exception {
+    // Skip all tests of this class if no test CF platform is specified
+    assumeNotNull(TEST_TARGET);
     FreeStyleProject project = j.createFreeStyleProject();
     project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-multi-hello-java.zip")));
     CloudFoundryPushBuilder cf = new CloudFoundryPushBuilder(TEST_TARGET, TEST_ORG, TEST_SPACE,
@@ -430,6 +446,8 @@ public class CloudFoundryPushBuilderTest {
 
   @Test
   public void testPerformCustomManifestFileLocation() throws Exception {
+    // Skip all tests of this class if no test CF platform is specified
+    assumeNotNull(TEST_TARGET);
     FreeStyleProject project = j.createFreeStyleProject();
     project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-java-custom-manifest-location.zip")));
 
@@ -463,6 +481,8 @@ public class CloudFoundryPushBuilderTest {
   @Test
   @WithTimeout(600)
   public void testPerformCustomTimeout() throws Exception {
+    // Skip all tests of this class if no test CF platform is specified
+    assumeNotNull(TEST_TARGET);
     FreeStyleProject project = j.createFreeStyleProject();
 
     project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-java.zip")));
@@ -489,6 +509,8 @@ public class CloudFoundryPushBuilderTest {
   @Test
   //TODO fix race condition.
   public void testPerformEnvVarsManifestFile() throws Exception {
+    // Skip all tests of this class if no test CF platform is specified
+    assumeNotNull(TEST_TARGET);
     FreeStyleProject project = j.createFreeStyleProject();
     project.setScm(new ExtractResourceSCM(getClass().getResource("python-env.zip")));
     CloudFoundryPushBuilder cf = new CloudFoundryPushBuilder(TEST_TARGET, TEST_ORG, TEST_SPACE,
@@ -518,6 +540,8 @@ public class CloudFoundryPushBuilderTest {
 
   @Test
   public void testPerformServicesNamesManifestFile() throws Exception {
+    // Skip all tests of this class if no test CF platform is specified
+    assumeNotNull(TEST_TARGET);
     cloudFoundryOperations.services().createInstance(CreateServiceInstanceRequest.builder()
             .serviceInstanceName("mysql_service1")
             .serviceName(TEST_MYSQL_SERVICE_TYPE)
@@ -558,6 +582,8 @@ public class CloudFoundryPushBuilderTest {
 
   @Test
   public void testPerformCreateService() throws Exception {
+    // Skip all tests of this class if no test CF platform is specified
+    assumeNotNull(TEST_TARGET);
     FreeStyleProject project = j.createFreeStyleProject();
     project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-spring-mysql.zip")));
 
@@ -592,6 +618,8 @@ public class CloudFoundryPushBuilderTest {
 
   @Test
   public void testPerformResetService() throws Exception {
+    // Skip all tests of this class if no test CF platform is specified
+    assumeNotNull(TEST_TARGET);
     cloudFoundryOperations.services().createInstance(CreateServiceInstanceRequest.builder()
             .serviceInstanceName("mysql-spring")
             // Not the right type of service, must be reset for hello-mysql-spring to work
@@ -633,6 +661,8 @@ public class CloudFoundryPushBuilderTest {
 
   @Test
   public void testPerformNoRoute() throws Exception {
+    // Skip all tests of this class if no test CF platform is specified
+    assumeNotNull(TEST_TARGET);
     FreeStyleProject project = j.createFreeStyleProject();
     project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-java.zip")));
     ManifestChoice manifest
@@ -658,6 +688,8 @@ public class CloudFoundryPushBuilderTest {
 
   @Test
   public void testPerformUnknownHost() throws Exception {
+    // Skip all tests of this class if no test CF platform is specified
+    assumeNotNull(TEST_TARGET);
     FreeStyleProject project = j.createFreeStyleProject();
     project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-java.zip")));
     CloudFoundryPushBuilder cf = new CloudFoundryPushBuilder("https://does-not-exist.local",
@@ -676,6 +708,8 @@ public class CloudFoundryPushBuilderTest {
 
   @Test
   public void testPerformWrongCredentials() throws Exception {
+    // Skip all tests of this class if no test CF platform is specified
+    assumeNotNull(TEST_TARGET);
     FreeStyleProject project = j.createFreeStyleProject();
     project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-java.zip")));
 
@@ -700,6 +734,8 @@ public class CloudFoundryPushBuilderTest {
   @Test
   @Issue("JENKINS-47271")
   public void testManifestInheritance() throws Exception {
+    // Skip all tests of this class if no test CF platform is specified
+    assumeNotNull(TEST_TARGET);
     FreeStyleProject project = j.createFreeStyleProject();
     project.setScm(new ExtractResourceSCM(getClass().getResource("cloudfoundry-hello-spring-mysql-inherited.zip")));
 
@@ -731,4 +767,6 @@ public class CloudFoundryPushBuilderTest {
     assertTrue("App did not send back correct text",
             content.contains("State [id=1, stateCode=MA, name=Massachusetts]"));
   }
+
+
 }
