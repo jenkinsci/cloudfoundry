@@ -24,8 +24,9 @@ import java.net.URL;
 import jenkins.model.Jenkins;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.QueryParameter;
+import org.kohsuke.stapler.interceptor.RequirePOST;
 
-/**
+ /**
  * Extension point descriptor for cloudfoundry push.
  *
  * @author williamg
@@ -104,6 +105,7 @@ public abstract class AbstractCloudFoundryPushDescriptor<T extends BuildStep & D
      * @return the validation result
      */
     @SuppressWarnings(value = "unused")
+    @RequirePOST
     public FormValidation doTestConnection(@AncestorInPath ItemGroup context,
                                            @AncestorInPath Item item,
                                            @QueryParameter(value = "target") final String target,
